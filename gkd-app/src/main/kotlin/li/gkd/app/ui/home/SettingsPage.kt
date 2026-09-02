@@ -652,11 +652,11 @@ private fun BlockA11yDialog(
                             imageVector = PerfIcon.OpenInNew,
                             onClickLabel = "打开应用详情页面",
                             onClick = {
-                                val inputManager = privilegeContextFlow.value?.inputManager
-                                if (inputManager == null) {
+                                val privilegeContext = privilegeContextFlow.value
+                                if (privilegeContext == null) {
                                     mainVm.navigatePage(PrivilegeServiceRoute)
                                 } else {
-                                    inputManager.keyevent(KeyEvent.KEYCODE_APP_SWITCH)
+                                    privilegeContext.keyevent(KeyEvent.KEYCODE_APP_SWITCH)
                                 }
                             },
                         )

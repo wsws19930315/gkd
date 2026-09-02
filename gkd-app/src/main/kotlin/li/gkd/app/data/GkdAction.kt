@@ -70,9 +70,7 @@ sealed class ActionPerformer(val action: String) {
             return ActionResult(
                 action = action,
                 result = if (
-                    privilegeContextFlow.value?.run {
-                        inputManager.tap(x, y)
-                    } == true
+                    privilegeContextFlow.value?.tap(x, y) == true
                 ) {
                     true
                 } else {
@@ -147,9 +145,7 @@ sealed class ActionPerformer(val action: String) {
             return ActionResult(
                 action = action,
                 result = if (
-                    privilegeContextFlow.value?.run {
-                        inputManager.tap(x, y, LONG_DURATION)
-                    } == true
+                    privilegeContextFlow.value?.tap(x, y, LONG_DURATION) == true
                 ) {
                     true
                 } else {
@@ -244,15 +240,13 @@ sealed class ActionPerformer(val action: String) {
             }
             TrackService.addSwipePosition(startX, startY, endX, endY, swipeArg.duration)
             return if (
-                privilegeContextFlow.value?.run {
-                    inputManager.swipe(
-                        startX,
-                        startY,
-                        endX,
-                        endY,
-                        swipeArg.duration
-                    )
-                } == true
+                privilegeContextFlow.value?.swipe(
+                    startX,
+                    startY,
+                    endX,
+                    endY,
+                    swipeArg.duration,
+                ) == true
             ) {
                 ActionResult(
                     action = action,

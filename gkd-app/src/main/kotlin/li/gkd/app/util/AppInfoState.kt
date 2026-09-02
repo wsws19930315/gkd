@@ -123,20 +123,20 @@ val updateAppMutex = MutexState()
 
 private fun updateOtherUserAppInfo(userAppInfoMap: Map<String, AppInfo>? = null) {
     val privilegeContext = privilegeContextFlow.value
-    val pkgManager = privilegeContext?.packageManager
-    val userManager = privilegeContext?.userManager
     val actualUserAppInfoMap = userAppInfoMap ?: userAppInfoMapFlow.value
-    if (pkgManager == null || userManager == null || actualUserAppInfoMap.isEmpty()) {
+    if (privilegeContext == null || actualUserAppInfoMap.isEmpty()) {
         otherUserMapFlow.value = emptyMap()
         otherUserAppIconMapFlow.value = emptyMap()
         otherUserAppInfoMapFlow.value = emptyMap()
         return
     }
-    val otherUsers = userManager.getUsers().filter { it.id != currentUserId }.sortedBy { it.id }
+    val otherUsers = privilegeContext.getUsers()
+        .filter { it.id != currentUserId }
+        .sortedBy { it.id }
     val userPackageInfoMap = otherUsers.associate { user ->
-        user.id to pkgManager.appPackageManager.getInstalledPackagesAsUser(
+        user.id to privilegeContext.getInstalledPackagesAsUser(
             PKG_FLAGS,
-            user.id
+            user.id,
         ).filterNot { actualUserAppInfoMap.contains(it.packageName) }
     }
     val newIconMap = HashMap<String, Drawable>()
@@ -210,9 +210,8 @@ fun updateAllAppInfo(): Unit = updateAppMutex.launchTry(appScope, Dispatchers.IO
             "updateAllAppInfo",
             "mayAuthDenied=$mayAuthDenied, newAppMap.size=${newAppMap.size}"
         )
-        val pkgList2 = privilegeContextFlow.value?.run {
-            packageManager.appPackageManager.getInstalledPackagesAsUser(PKG_FLAGS, currentUserId)
-        }
+        val pkgList2 = privilegeContextFlow.value
+            ?.getInstalledPackagesAsUser(PKG_FLAGS, currentUserId)
         if (!pkgList2.isNullOrEmpty()) {
             pkgList2.forEach { pkgInfo ->
                 val (appInfo, appIcon) = pkgInfo.toAppInfoAndIcon()

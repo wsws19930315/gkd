@@ -150,9 +150,7 @@ object SnapshotCapture {
     private suspend fun isFocusedWindowSecure(appId: String): Boolean? =
         withContext(Dispatchers.IO) {
             try {
-                privilegeContextFlow.value?.run {
-                    wmManager.isFocusedWindowSecure(appId)
-                }
+                privilegeContextFlow.value?.isFocusedWindowSecure(appId)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

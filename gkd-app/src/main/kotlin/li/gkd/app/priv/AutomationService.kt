@@ -120,9 +120,7 @@ class AutomationService private constructor(
 
         fun isOtherUiAutomationRunning(): Boolean {
             if (uiAutomationFlow.value != null) return false
-            return privilegeContextFlow.value?.run {
-                a11yManager.isUiAutomationRunning()
-            } == true
+            return privilegeContextFlow.value?.isUiAutomationRunning() == true
         }
 
         fun showOccupiedWarning(silent: Boolean = false) {
