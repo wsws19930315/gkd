@@ -227,6 +227,11 @@ private fun AdvancedContent() {
                     EventService.setEnabled(mainVm, enabled)
                 },
             )
+            SettingItem(
+                title = "崩溃记录",
+                subtitle = "应用异常退出记录",
+                onClick = { mainVm.navigatePage(CrashReportRoute) },
+            )
             Spacer(modifier = Modifier.height(EmptyHeight))
         }
     }
