@@ -95,7 +95,7 @@ class HttpService : Service(), OnSimpleLife by DefaultSimpleLifeImpl() {
             httpServerFlow.value = null
         }
         onCreated {
-            NotificationCatalog.http().startForeground()
+            NotificationCatalog.http(httpServerPortFlow.value).startForeground()
             scope.launchTry(Dispatchers.IO) {
                 httpServerPortFlow.collect { port ->
                     val isReboot = httpServerFlow.value != null
@@ -117,8 +117,11 @@ class HttpService : Service(), OnSimpleLife by DefaultSimpleLifeImpl() {
                     }
                     if (httpServerFlow.value == null) {
                         stopSelf()
-                    } else if (isReboot) {
-                        toast("HTTP服务重启成功")
+                    } else {
+                        NotificationCatalog.http(port).startForeground()
+                        if (isReboot) {
+                            toast("HTTP服务重启成功")
+                        }
                     }
                 }
             }
