@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -21,10 +22,15 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.contentColorFor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
@@ -47,73 +53,101 @@ import li.gkd.app.ui.EventLogCard
 import li.gkd.app.ui.component.PerfIcon
 import li.gkd.app.ui.component.PerfIconButton
 import li.gkd.app.ui.component.rememberLazyListAutoFollowState
-import li.gkd.app.util.launchTry
 import li.gkd.app.util.IntentUtils
+import li.gkd.app.util.launchTry
 import kotlin.time.Duration.Companion.milliseconds
 
 class EventService : OverlayWindowService(positionKey = "event") {
 
     val eventLogs = mutableStateListOf<A11yEventLog>()
+    private var minimized by mutableStateOf(false)
+
+    override fun isViewClickEnabled(): Boolean = minimized
+
+    override fun onClickView() {
+        minimized = false
+    }
 
     @Composable
     override fun ComposeContent() {
-        val bgColor = MaterialTheme.colorScheme.surface
-        CompositionLocalProvider(
-            LocalContentColor provides contentColorFor(bgColor),
-        ) {
-            val latestEventId = eventLogs.lastOrNull()?.id ?: 0
-            val followState = rememberLazyListAutoFollowState(
-                itemCount = eventLogs.size,
-                latestItemKey = latestEventId,
-            )
-            Column(
+        if (minimized) {
+            val alpha = 0.75f
+            PerfIcon(
+                imageVector = PerfIcon.UnfoldMore,
+                contentDescription = "恢复事件日志窗口",
                 modifier = Modifier
                     .clip(MaterialTheme.shapes.small)
-                    .background(bgColor.copy(alpha = 0.9f))
-                    .width(256.dp)
-                    .padding(4.dp)
-            ) {
-                ClosableTitle(
-                    title = if (A11yService.isRunning.collectAsStateWithLifecycle().value || uiAutomationFlow.collectAsStateWithLifecycle().value != null) "事件服务" else "事件服务(无权限)"
-                )
-                val textStyle = MaterialTheme.typography.labelSmall
-                CompositionLocalProvider(
-                    LocalTextStyle provides textStyle,
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(300.dp)
-                    ) {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            state = followState.listState,
-                            contentPadding = PaddingValues(bottom = 6.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
-                            items(eventLogs, { it.id }) {
-                                EventLogCard(
-                                    eventLog = it,
-                                    modifier = Modifier.padding(horizontal = 2.dp)
-                                )
-                            }
+                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = alpha))
+                    .semantics {
+                        onClick(label = "恢复事件日志窗口") {
+                            minimized = false
+                            true
                         }
-                        if (eventLogs.isNotEmpty() && !followState.isAutoFollowEnabled) {
-                            val count = (latestEventId - followState.pausedAtItemKey)
-                                .coerceAtLeast(0)
-                            Column(
-                                modifier = Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .width(IntrinsicSize.Min),
-                                horizontalAlignment = Alignment.CenterHorizontally,
+                    }
+                    .size(40.dp),
+                tint = MaterialTheme.colorScheme.primary.copy(alpha = alpha),
+            )
+        } else {
+            val bgColor = MaterialTheme.colorScheme.surface
+            CompositionLocalProvider(
+                LocalContentColor provides contentColorFor(bgColor),
+            ) {
+                val latestEventId = eventLogs.lastOrNull()?.id ?: 0
+                val followState = rememberLazyListAutoFollowState(
+                    itemCount = eventLogs.size,
+                    latestItemKey = latestEventId,
+                )
+                Column(
+                    modifier = Modifier
+                        .clip(MaterialTheme.shapes.small)
+                        .background(bgColor.copy(alpha = 0.9f))
+                        .width(256.dp)
+                        .padding(4.dp)
+                ) {
+                    ClosableTitle(
+                        title = if (A11yService.isRunning.collectAsStateWithLifecycle().value || uiAutomationFlow.collectAsStateWithLifecycle().value != null) "事件服务" else "事件服务(无权限)",
+                        onMinimizeRequest = { minimized = true },
+                        minimizeContentDescription = "缩小事件日志窗口",
+                    )
+                    val textStyle = MaterialTheme.typography.labelSmall
+                    CompositionLocalProvider(
+                        LocalTextStyle provides textStyle,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(300.dp)
+                        ) {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                state = followState.listState,
+                                contentPadding = PaddingValues(bottom = 6.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
                             ) {
-                                if (count > 0) {
-                                    Text(text = "+$count")
+                                items(eventLogs, { it.id }) {
+                                    EventLogCard(
+                                        eventLog = it,
+                                        modifier = Modifier.padding(horizontal = 2.dp)
+                                    )
                                 }
-                                PerfIconButton(
-                                    imageVector = PerfIcon.ArrowDownward,
-                                    onClick = followState::resume,
-                                )
+                            }
+                            if (eventLogs.isNotEmpty() && !followState.isAutoFollowEnabled) {
+                                val count = (latestEventId - followState.pausedAtItemKey)
+                                    .coerceAtLeast(0)
+                                Column(
+                                    modifier = Modifier
+                                        .align(Alignment.BottomEnd)
+                                        .width(IntrinsicSize.Min),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                ) {
+                                    if (count > 0) {
+                                        Text(text = "+$count")
+                                    }
+                                    PerfIconButton(
+                                        imageVector = PerfIcon.ArrowDownward,
+                                        onClick = followState::resume,
+                                    )
+                                }
                             }
                         }
                     }

@@ -148,12 +148,26 @@ abstract class OverlayWindowService(
     abstract fun ComposeContent()
 
     @Composable
-    fun ClosableTitle(title: String) {
+    fun ClosableTitle(
+        title: String,
+        onMinimizeRequest: (() -> Unit)? = null,
+        minimizeContentDescription: String = "缩小窗口",
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
         ) {
             PerfIcon(imageVector = DragPan, modifier = Modifier.iconTextSize())
             Text(text = title, modifier = Modifier.weight(1f))
+            if (onMinimizeRequest != null) {
+                PerfIcon(
+                    imageVector = PerfIcon.ExpandMore,
+                    contentDescription = minimizeContentDescription,
+                    modifier = Modifier
+                        .clip(MaterialTheme.shapes.extraSmall)
+                        .clickable(onClick = throttle(onMinimizeRequest))
+                        .iconTextSize(),
+                )
+            }
             PerfIcon(
                 imageVector = PerfIcon.Close,
                 modifier = Modifier
@@ -167,6 +181,8 @@ abstract class OverlayWindowService(
     }
 
     open fun onClickView() {}
+
+    open fun isViewClickEnabled(): Boolean = true
 
     open fun onLongClickView() {}
 
@@ -306,6 +322,9 @@ abstract class OverlayWindowService(
             }
             var downXy: Pair<Float, Float>? = null
             var longClickJob: kotlinx.coroutines.Job? = null
+            var viewClickEnabled = false
+            var isDragging = false
+            val touchSlop = ViewConfiguration.get(this).scaledTouchSlop
             @SuppressLint("ClickableViewAccessibility")
             view.setOnTouchListener { _, event ->
                 if (fixMoveFlag > 0) return@setOnTouchListener true
@@ -315,6 +334,8 @@ abstract class OverlayWindowService(
                         screenWidth = ScreenUtils.getScreenWidth()
                         screenHeight = ScreenUtils.getScreenHeight()
                         paramsXy = layoutParams.x to layoutParams.y
+                        viewClickEnabled = isViewClickEnabled()
+                        isDragging = false
                         longClickJob = null
                         longClickJob = scope.launch {
                             delay(500.milliseconds)
@@ -330,6 +351,9 @@ abstract class OverlayWindowService(
                         downXy?.let { downEvent ->
                             val dx = (event.rawX - downEvent.first).toInt()
                             val dy = (event.rawY - downEvent.second).toInt()
+                            if (abs(dx) > touchSlop || abs(dy) > touchSlop) {
+                                isDragging = true
+                            }
                             val x = dx + paramsXy.first
                             val y = dy + paramsXy.second
                             layoutParams.x = x.coerceIn(marginX, screenWidth - view.width - marginX)
@@ -339,12 +363,9 @@ abstract class OverlayWindowService(
                             )
                             positionFlow.value = listOf(layoutParams.x, layoutParams.y)
                             app.windowManager.updateViewLayout(view, layoutParams)
-                            longClickJob?.let {
-                                val maxBreakLongOffset = 10
-                                if (abs(dx) > maxBreakLongOffset || abs(dy) > maxBreakLongOffset) {
-                                    longClickJob?.cancel()
-                                    longClickJob = null
-                                }
+                            if (isDragging) {
+                                longClickJob?.cancel()
+                                longClickJob = null
                             }
                         }
                         true
@@ -352,10 +373,18 @@ abstract class OverlayWindowService(
 
                     MotionEvent.ACTION_UP -> {
                         val gapTime = event.eventTime - event.downTime
-                        if (gapTime <= ViewConfiguration.getTapTimeout()) {
+                        if (viewClickEnabled && !isDragging && gapTime <= ViewConfiguration.getTapTimeout()) {
                             onClickView()
                         }
                         downXy = null
+                        longClickJob?.cancel()
+                        longClickJob = null
+                        true
+                    }
+
+                    MotionEvent.ACTION_CANCEL -> {
+                        downXy = null
+                        longClickJob?.cancel()
                         longClickJob = null
                         true
                     }
