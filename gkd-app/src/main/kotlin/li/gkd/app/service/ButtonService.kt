@@ -15,8 +15,7 @@ import li.gkd.app.permission.PermissionStates
 import li.gkd.app.ui.component.PerfIcon
 import li.gkd.app.snapshot.SnapshotCapture
 import li.gkd.app.util.launchTry
-import li.gkd.app.util.startForegroundServiceByClass
-import li.gkd.app.util.stopServiceByClass
+import li.gkd.app.util.IntentUtils
 
 class ButtonService : OverlayWindowService(
     positionKey = "button"
@@ -58,10 +57,10 @@ class ButtonService : OverlayWindowService(
         val isRunning = MutableStateFlow(false)
         fun start() {
             if (!PermissionStates.drawOverlays.checkOrToast()) return
-            startForegroundServiceByClass(ButtonService::class)
+            IntentUtils.startForegroundServiceByClass(ButtonService::class)
         }
 
-        fun stop() = stopServiceByClass(ButtonService::class)
+        fun stop() = IntentUtils.stopServiceByClass(ButtonService::class)
 
         suspend fun setEnabled(mainVm: MainViewModel, enabled: Boolean) {
             if (!enabled) {

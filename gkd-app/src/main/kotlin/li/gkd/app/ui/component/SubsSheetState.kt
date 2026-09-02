@@ -48,8 +48,7 @@ import li.gkd.app.ui.style.itemHorizontalPadding
 import li.gkd.db.LOCAL_SUBS_ID
 import li.gkd.app.util.SubscriptionResult
 import li.gkd.app.util.launchTry
-import li.gkd.app.util.subsItemsFlow
-import li.gkd.app.util.subsMapFlow
+import li.gkd.app.util.SubsState
 import li.gkd.app.util.throttle
 import li.gkd.app.util.toast
 
@@ -91,7 +90,7 @@ class SubsSheetState {
     ) {
         val vm = viewModel<SubsSheetVm>()
         val scope = vm.scope
-        val subsItems by subsItemsFlow.collectAsStateWithLifecycle()
+        val subsItems by SubsState.subsItemsFlow.collectAsStateWithLifecycle()
         val subsItem = subsItems.find { it.id == renderedSubsId }
         LaunchedEffect(requestedSubsId, subsItem) {
             if (requestedSubsId == null && subsItem == null) {
@@ -100,7 +99,7 @@ class SubsSheetState {
         }
         if (subsItem != null) {
             val mainVm = LocalMainViewModel.current
-            val subsIdToRaw by subsMapFlow.collectAsStateWithLifecycle()
+            val subsIdToRaw by SubsState.subsMapFlow.collectAsStateWithLifecycle()
             val scrollState = rememberScrollState()
             val sheetGesturesEnabled by remember {
                 derivedStateOf { scrollState.value == 0 }

@@ -16,7 +16,7 @@ import li.gkd.app.data.RawSubscription
 import li.gkd.db.SubsConfig
 import li.gkd.db.Db
 import li.gkd.app.ui.share.BaseViewModel
-import li.gkd.app.util.subsMapFlow
+import li.gkd.app.util.SubsState
 
 data class ActionLogListItem(
     val actionLog: ActionLog,
@@ -43,7 +43,7 @@ class ActionLogVm(val route: ActionLogRoute) : BaseViewModel() {
     }
         .flow
         .cachedIn(scope)
-        .combine(subsMapFlow) { pagingData, subsMap ->
+        .combine(SubsState.subsMapFlow) { pagingData, subsMap ->
             pagingData.map { actionLog ->
                 val subscription = subsMap[actionLog.subsId]
                 val group = if (actionLog.groupType == SubsConfig.AppGroupType) {
@@ -83,7 +83,7 @@ class ActionLogVm(val route: ActionLogRoute) : BaseViewModel() {
                     actionLog.groupKey,
                 )
             }
-            combine(configFlow, subsMapFlow) { subsConfig, subsMap ->
+            combine(configFlow, SubsState.subsMapFlow) { subsConfig, subsMap ->
                 val subscription = subsMap[actionLog.subsId]
                 val exclude = ExcludeData.parse(subsConfig?.exclude)
                 val globalAppChecked = if (actionLog.groupType == SubsConfig.GlobalGroupType) {

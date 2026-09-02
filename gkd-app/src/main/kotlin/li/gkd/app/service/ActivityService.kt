@@ -40,8 +40,7 @@ import li.gkd.app.priv.privilegeContextFlow
 import li.gkd.app.ui.component.PerfIcon
 import li.gkd.app.ui.style.iconTextSize
 import li.gkd.app.util.copyText
-import li.gkd.app.util.startForegroundServiceByClass
-import li.gkd.app.util.stopServiceByClass
+import li.gkd.app.util.IntentUtils
 
 
 class ActivityService : OverlayWindowService(
@@ -132,10 +131,10 @@ class ActivityService : OverlayWindowService(
         val isRunning = MutableStateFlow(false)
         fun start() {
             if (!PermissionStates.drawOverlays.checkOrToast()) return
-            startForegroundServiceByClass(ActivityService::class)
+            IntentUtils.startForegroundServiceByClass(ActivityService::class)
         }
 
-        fun stop() = stopServiceByClass(ActivityService::class)
+        fun stop() = IntentUtils.stopServiceByClass(ActivityService::class)
 
         suspend fun setEnabled(mainVm: MainViewModel, enabled: Boolean) {
             if (!enabled) {

@@ -38,8 +38,7 @@ import li.gkd.app.util.AndroidTarget
 import li.gkd.app.util.DefaultSimpleLifeImpl
 import li.gkd.app.util.OnSimpleLife
 import li.gkd.app.util.ScreenUtils
-import li.gkd.app.util.startForegroundServiceByClass
-import li.gkd.app.util.stopServiceByClass
+import li.gkd.app.util.IntentUtils
 import kotlin.math.min
 import kotlin.math.pow
 
@@ -322,8 +321,8 @@ class TrackService : LifecycleService(), SavedStateRegistryOwner,
         val isRunning: StateFlow<Boolean>
             field = MutableStateFlow(false)
 
-        fun start() = startForegroundServiceByClass(TrackService::class)
-        fun stop() = stopServiceByClass(TrackService::class)
+        fun start() = IntentUtils.startForegroundServiceByClass(TrackService::class)
+        fun stop() = IntentUtils.stopServiceByClass(TrackService::class)
         fun addA11yNodePosition(node: AccessibilityNodeInfo) {
             service?.addPoint(
                 TrackPoint(

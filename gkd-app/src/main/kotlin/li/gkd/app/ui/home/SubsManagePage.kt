@@ -69,7 +69,7 @@ import li.gkd.app.util.UpdateTimeOption
 import li.gkd.app.util.findOption
 import li.gkd.app.util.getUpDownTransform
 import li.gkd.app.util.launchTry
-import li.gkd.app.util.ruleSummaryFlow
+import li.gkd.app.util.SubsState
 import li.gkd.app.util.throttle
 import li.gkd.app.util.toast
 import sh.calvin.reorderable.ReorderableItem
@@ -120,7 +120,7 @@ private fun useLoadedSubsManagePage(
     val settingsDialogVisible by vm.settingsDialogVisibleFlow.collectAsStateWithLifecycle()
     val powerWarningItem by vm.powerWarningItemFlow.collectAsStateWithLifecycle()
     val store by storeFlow.collectAsStateWithLifecycle()
-    val ruleSummary by ruleSummaryFlow.collectAsStateWithLifecycle()
+    val ruleSummary by SubsState.ruleSummaryFlow.collectAsStateWithLifecycle()
     val subItems = state.subItems
     val subsIdToRaw = state.subscriptions
     val scope = vm.scope

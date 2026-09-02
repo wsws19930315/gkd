@@ -57,13 +57,11 @@ import li.gkd.app.util.SERVER_SCRIPT_URL
 import li.gkd.app.snapshot.SnapshotCapture
 import li.gkd.app.snapshot.SnapshotStore
 import li.gkd.app.util.SubscriptionStore
-import li.gkd.app.util.getIpAddressInLocalNetwork
-import li.gkd.app.util.isPortAvailable
+import li.gkd.app.util.NetworkUtils
 import li.gkd.app.util.keepNullJson
 import li.gkd.app.util.launchTry
 import li.gkd.app.util.mapState
-import li.gkd.app.util.startForegroundServiceByClass
-import li.gkd.app.util.stopServiceByClass
+import li.gkd.app.util.IntentUtils
 import li.gkd.app.util.toast
 
 
@@ -82,7 +80,7 @@ class HttpService : Service(), OnSimpleLife by DefaultSimpleLifeImpl() {
         onCreated {
             scope.launchTry(Dispatchers.IO) {
                 httpServerPortFlow.collect {
-                    localNetworkIpsFlow.value = getIpAddressInLocalNetwork()
+                    localNetworkIpsFlow.value = NetworkUtils.getIpAddressInLocalNetwork()
                 }
             }
         }
@@ -103,7 +101,7 @@ class HttpService : Service(), OnSimpleLife by DefaultSimpleLifeImpl() {
                         value?.stop()
                         value = null
                     }
-                    if (!isPortAvailable(port)) {
+                    if (!NetworkUtils.isPortAvailable(port)) {
                         toast("端口 $port 被占用，请更换后重试")
                         stopSelf()
                         return@collect
@@ -132,8 +130,8 @@ class HttpService : Service(), OnSimpleLife by DefaultSimpleLifeImpl() {
         val httpServerFlow = MutableStateFlow<ServerType?>(null)
         val isRunning = MutableStateFlow(false)
         val localNetworkIpsFlow = MutableStateFlow(emptyList<String>())
-        fun stop() = stopServiceByClass(HttpService::class)
-        fun start() = startForegroundServiceByClass(HttpService::class)
+        fun stop() = IntentUtils.stopServiceByClass(HttpService::class)
+        fun start() = IntentUtils.startForegroundServiceByClass(HttpService::class)
 
         suspend fun setEnabled(mainVm: MainViewModel, enabled: Boolean) {
             if (!enabled) {

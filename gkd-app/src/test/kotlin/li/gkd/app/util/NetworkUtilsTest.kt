@@ -4,7 +4,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class NetworkExtTest {
+class NetworkUtilsTest {
     @Test
     fun isLocalNetworkUrlRecognizesLocalHosts() {
         listOf(
@@ -22,7 +22,7 @@ class NetworkExtTest {
             "http://[fc00::1]/subscription.json",
             "http://[fe80::1]/subscription.json",
         ).forEach { url ->
-            assertTrue(url, isLocalNetworkUrl(url))
+            assertTrue(url, NetworkUtils.isLocalNetworkUrl(url))
         }
     }
 
@@ -35,7 +35,7 @@ class NetworkExtTest {
             "http://172.32.0.0/subscription.json",
             "not a URL",
         ).forEach { url ->
-            assertFalse(url, isLocalNetworkUrl(url))
+            assertFalse(url, NetworkUtils.isLocalNetworkUrl(url))
         }
     }
 }

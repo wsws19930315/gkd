@@ -20,9 +20,9 @@ import li.gkd.app.ui.share.filterSubsApps
 import li.gkd.app.ui.share.subsAppActionOrderMapState
 import li.gkd.app.ui.share.useSubsAppFilter
 import li.gkd.app.util.AppSortOption
-import li.gkd.app.util.appInfoMapFlow
+import li.gkd.app.util.AppInfoState
 import li.gkd.app.util.findOption
-import li.gkd.app.util.getGroupEnable
+import li.gkd.app.util.SubsState
 
 data class SubsAppListUiState(
     val apps: List<RawSubscription.RawApp>,
@@ -66,7 +66,7 @@ class SubsAppListVm(
             rawSubscription.apps.associate { rawApp ->
                 val enableSize = rawApp.groups.count { group ->
                     val category = rawSubscription.getCategory(group.name)
-                    getGroupEnable(
+                    SubsState.getGroupEnable(
                         group,
                         groupSubsConfigMap[rawApp.id]?.get(group.key),
                         category,
@@ -91,7 +91,7 @@ class SubsAppListVm(
         )
         val filteredAppsFlow = combine(
             sortedAppsFlow,
-            appInfoMapFlow,
+            AppInfoState.appInfoMapFlow,
             debounceSearchStr,
         ) { list, appMap, searchStr ->
             buildUiState(rawSubscription, list, appMap, searchStr)
@@ -103,7 +103,7 @@ class SubsAppListVm(
         val settings = storeFlow.value
         val apps = filterSubsApps(
             apps = rawSubscription.apps,
-            appMap = appInfoMapFlow.value,
+            appMap = AppInfoState.appInfoMapFlow.value,
             settings = settings,
             appActionOrderMap = appActionOrderMapState.value.value.orEmpty(),
             appVisitOrderMap = mainVm.appVisitOrderMapState.value.value.orEmpty(),
@@ -115,7 +115,7 @@ class SubsAppListVm(
         return buildUiState(
             rawSubscription = rawSubscription,
             apps = apps,
-            appMap = appInfoMapFlow.value,
+            appMap = AppInfoState.appInfoMapFlow.value,
             searchStr = searchStrFlow.value,
         )
     }

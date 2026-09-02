@@ -51,7 +51,7 @@ import li.gkd.app.ui.style.surfaceCardColors
 import li.gkd.app.util.AutomatorModeOption
 import li.gkd.app.util.ShortUrlSet
 import li.gkd.app.util.launchAsFn
-import li.gkd.app.util.openA11ySettings
+import li.gkd.app.util.IntentUtils
 import li.gkd.app.util.throttle
 import li.gkd.app.util.toast
 
@@ -142,7 +142,7 @@ fun WorkModePage() {
                             horizontalArrangement = Arrangement.SpaceBetween,
                         ) {
                             TextButton(
-                                onClick = throttle { openA11ySettings() },
+                                onClick = throttle { IntentUtils.openA11ySettings() },
                             ) {
                                 Text(
                                     text = "手动授权",

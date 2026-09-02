@@ -11,8 +11,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import li.gkd.app.appScope
 import li.gkd.app.util.json
-import li.gkd.app.util.privateStoreFolder
-import li.gkd.app.util.storeFolder
+import li.gkd.app.util.FolderUtils
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -64,7 +63,7 @@ fun <T> createTextFlow(
     debounceMillis: Long = 0,
 ): MutableStoreStateFlow<T> {
     val filename = if (key.contains('.')) key else "$key.txt"
-    val file = (if (private) privateStoreFolder else storeFolder).resolve(filename)
+    val file = (if (private) FolderUtils.privateStoreFolder else FolderUtils.storeFolder).resolve(filename)
     val initText = readStoreText(file)
     val initValue = decode(initText)
     val stateFlow = MutableStateFlow(initValue)

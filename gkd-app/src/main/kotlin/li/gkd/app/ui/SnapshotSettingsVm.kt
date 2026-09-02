@@ -3,7 +3,7 @@ package li.gkd.app.ui
 import kotlinx.coroutines.flow.update
 import li.gkd.app.store.storeFlow
 import li.gkd.app.ui.share.BaseViewModel
-import li.gkd.app.util.appInfoMapFlow
+import li.gkd.app.util.AppInfoState
 import li.gkd.app.util.toast
 import li.gkd.selector.Selector
 import li.gkd.selector.SelectorCompileResult
@@ -20,7 +20,7 @@ class SnapshotSettingsVm : BaseViewModel() {
         ) {
             return true
         }
-        if (appId.isNotEmpty() && !appInfoMapFlow.value.contains(appId)) {
+        if (appId.isNotEmpty() && !AppInfoState.appInfoMapFlow.value.contains(appId)) {
             toast("无效应用ID")
             return false
         }

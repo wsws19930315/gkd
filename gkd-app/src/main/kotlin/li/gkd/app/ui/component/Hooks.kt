@@ -33,12 +33,12 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import li.gkd.app.data.RawSubscription
 import li.gkd.app.util.mapState
-import li.gkd.app.util.subsMapFlow
+import li.gkd.app.util.SubsState
 
 @Composable
 fun useSubs(subsId: Long?): RawSubscription? {
     val scope = rememberCoroutineScope()
-    return remember(subsId) { subsMapFlow.mapState(scope) { it[subsId] } }.collectAsStateWithLifecycle().value
+    return remember(subsId) { SubsState.subsMapFlow.mapState(scope) { it[subsId] } }.collectAsStateWithLifecycle().value
 }
 
 @Composable

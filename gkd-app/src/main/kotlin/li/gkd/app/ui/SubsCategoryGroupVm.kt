@@ -19,7 +19,8 @@ import li.gkd.app.ui.share.subsAppActionOrderMapState
 import li.gkd.app.ui.share.useSubsAppFilter
 import li.gkd.app.util.AppSortOption
 import li.gkd.app.util.EnableGroupOption
-import li.gkd.app.util.appInfoMapFlow
+import li.gkd.app.util.AppInfoState
+import li.gkd.app.util.SubsState
 import li.gkd.app.util.findOption
 import li.gkd.app.store.blockMatchAppListFlow
 import li.gkd.db.CategoryConfig
@@ -87,7 +88,7 @@ class SubsCategoryGroupVm(
         val settings = storeFlow.value
         val apps = filterSubsApps(
             apps = rawSubscription.getCategoryApps(route.categoryKey),
-            appMap = appInfoMapFlow.value,
+            appMap = AppInfoState.appInfoMapFlow.value,
             settings = settings,
             appActionOrderMap = appActionOrderMapState.value.value.orEmpty(),
             appVisitOrderMap = mainVm.appVisitOrderMapState.value.value.orEmpty(),
@@ -137,7 +138,7 @@ class SubsCategoryGroupVm(
         val category = state.category
         val configs = state.configs.value ?: error("类别配置尚未加载")
         val categoryConfig = configs.categoryConfig
-        val newValue = when (li.gkd.app.util.getCategoryEnable(category, categoryConfig)) {
+        val newValue = when (SubsState.getCategoryEnable(category, categoryConfig)) {
             false -> null
             null -> true
             true -> false

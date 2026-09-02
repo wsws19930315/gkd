@@ -48,8 +48,7 @@ import li.gkd.app.ui.component.PerfIcon
 import li.gkd.app.ui.component.PerfIconButton
 import li.gkd.app.ui.component.rememberLazyListAutoFollowState
 import li.gkd.app.util.launchTry
-import li.gkd.app.util.startForegroundServiceByClass
-import li.gkd.app.util.stopServiceByClass
+import li.gkd.app.util.IntentUtils
 import kotlin.time.Duration.Companion.milliseconds
 
 class EventService : OverlayWindowService(positionKey = "event") {
@@ -178,10 +177,10 @@ class EventService : OverlayWindowService(positionKey = "event") {
         val isRunning = MutableStateFlow(false)
         fun start() {
             if (!PermissionStates.drawOverlays.checkOrToast()) return
-            startForegroundServiceByClass(EventService::class)
+            IntentUtils.startForegroundServiceByClass(EventService::class)
         }
 
-        fun stop() = stopServiceByClass(EventService::class)
+        fun stop() = IntentUtils.stopServiceByClass(EventService::class)
 
         suspend fun setEnabled(mainVm: MainViewModel, enabled: Boolean) {
             if (!enabled) {

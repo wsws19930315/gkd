@@ -32,7 +32,7 @@ import li.gkd.app.util.ShortUrlSet
 import li.gkd.app.util.format
 import li.gkd.app.util.getShareApkFile
 import li.gkd.app.util.launchAsFn
-import li.gkd.app.util.openUri
+import li.gkd.app.util.IntentUtils
 
 @Composable
 fun AboutDialogs() {
@@ -67,7 +67,7 @@ private fun VersionInfoDialog() {
                     Column {
                         Text(text = "代码记录")
                         Text(
-                            modifier = Modifier.clickable { openUri(META.commitUrl) },
+                            modifier = Modifier.clickable { IntentUtils.openUri(META.commitUrl) },
                             text = META.tagName ?: META.commitId.substring(0, 16),
                             color = MaterialTheme.colorScheme.primary,
                             style = LocalTextStyle.current.copy(textDecoration = TextDecoration.Underline),

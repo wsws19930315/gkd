@@ -17,8 +17,7 @@ import li.gkd.app.appScope
 import li.gkd.app.priv.privilegeContextFlow
 import li.gkd.app.util.AndroidTarget
 import li.gkd.app.util.toast
-import li.gkd.app.util.updateAllAppInfo
-import li.gkd.app.util.updateAppMutex
+import li.gkd.app.util.AppInfoState
 import priv.kit.core.Privilege
 
 class PermissionState(
@@ -177,8 +176,8 @@ object PermissionStates {
             purpose = "用于展示设备应用并匹配应用规则",
             permission = PermissionLists.getGetInstalledAppsPermission(),
             onChanged = {
-                if (!updateAppMutex.mutex.isLocked) {
-                    updateAllAppInfo()
+                if (!AppInfoState.updateAppMutex.mutex.isLocked) {
+                    AppInfoState.updateAllAppInfo()
                 }
             },
         )

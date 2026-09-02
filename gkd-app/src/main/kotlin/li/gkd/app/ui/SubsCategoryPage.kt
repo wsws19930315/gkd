@@ -49,7 +49,7 @@ import li.gkd.app.ui.share.LocalMainViewModel
 import li.gkd.app.ui.share.noRippleClickable
 import li.gkd.app.ui.style.EmptyHeight
 import li.gkd.app.ui.style.scaffoldPadding
-import li.gkd.app.util.getCategoryEnable
+import li.gkd.app.util.SubsState
 import li.gkd.app.util.launchTry
 import li.gkd.app.util.throttle
 import li.gkd.app.util.toast
@@ -211,7 +211,7 @@ private fun CategoryItemCard(
                 modifier = Modifier
                     .pointerInput(Unit) { detectTapGestures { } } // 防止误触边界
                     .padding(8.dp),
-                checked = getCategoryEnable(category, categoryConfig),
+                checked = SubsState.getCategoryEnable(category, categoryConfig),
                 enabled = switchEnabled,
                 onCheckedChange = throttle(onEnabledChange),
             )

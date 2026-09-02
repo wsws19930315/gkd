@@ -57,7 +57,7 @@ import li.gkd.app.store.storeFlow
 import li.gkd.app.util.AppGroupOption
 import li.gkd.app.util.AppSortOption
 import li.gkd.app.util.findOption
-import li.gkd.app.util.getCategoryEnable
+import li.gkd.app.util.SubsState
 import li.gkd.app.util.launchTry
 import li.gkd.app.util.throttle
 import li.gkd.app.util.toast
@@ -110,7 +110,7 @@ fun SubsCategoryGroupPage(route: SubsCategoryGroupRoute) {
             }, actions = {
                 PerfIconButton(
                     enabled = switchEnabled,
-                    imageVector = when (getCategoryEnable(category, categoryConfig)) {
+                    imageVector = when (SubsState.getCategoryEnable(category, categoryConfig)) {
                         false -> PerfIcon.ToggleOff
                         null -> ToggleMid
                         true -> PerfIcon.ToggleOn

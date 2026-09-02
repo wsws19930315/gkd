@@ -87,7 +87,7 @@ object SubscriptionStore {
                     id = LOCAL_SUBS_ID,
                     order = items.minByOrNull { it.order }?.order ?: 0,
                 )
-                val file = subsFolder.resolve("$LOCAL_SUBS_ID.json")
+                val file = FolderUtils.subsFolder.resolve("$LOCAL_SUBS_ID.json")
                 if (file.exists()) {
                     Db.subsItemDao.insert(item)
                     refreshRawSubscriptions(listOf(item))
@@ -219,7 +219,7 @@ object SubscriptionStore {
                 subscriptionIds.forEach { id ->
                     if (fileError != null) return@forEach
                     fileError = runCatching {
-                        val file = subsFolder.resolve("$id.json")
+                        val file = FolderUtils.subsFolder.resolve("$id.json")
                         AtomicFile(file).delete()
                         if (file.exists()) throw IOException("无法删除 ${file.name}")
                     }.exceptionOrNull()
@@ -345,7 +345,7 @@ object SubscriptionStore {
                 items = missingItems,
                 previous = currentSnapshot ?: SubscriptionSnapshot(),
             )
-            val entries = buildSubsEntries(items, snapshot.subscriptions)
+            val entries = SubsState.buildSubsEntries(items, snapshot.subscriptions)
             if (entries.any { !it.subsItem.isLocal } && !NetworkUtils.isAvailable()) {
                 result = SubscriptionResult.Failure("网络不可用")
                 return@withStateLock
@@ -396,7 +396,7 @@ object SubscriptionStore {
         } else {
             subscription
         }
-        val file = subsFolder.resolve("$id.json")
+        val file = FolderUtils.subsFolder.resolve("$id.json")
         val previousBytes = file.takeIf { it.exists() }?.readBytes()
         writeAtomic(file, json.encodeToString(nextSubscription).encodeToByteArray())
         try {
@@ -445,7 +445,7 @@ object SubscriptionStore {
     }
 
     private fun load(id: Long): RawSubscription {
-        val file = subsFolder.resolve("$id.json")
+        val file = FolderUtils.subsFolder.resolve("$id.json")
         if (!file.exists()) {
             return when (id) {
                 LOCAL_SUBS_ID -> RawSubscription(id = id, name = "本地订阅", version = 0)

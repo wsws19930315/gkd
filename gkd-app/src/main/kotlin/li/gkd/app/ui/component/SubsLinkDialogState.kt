@@ -21,7 +21,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import li.gkd.db.Db
-import li.gkd.app.util.isLocalNetworkUrl
+import li.gkd.app.util.NetworkUtils
 import li.gkd.app.util.throttle
 import li.gkd.app.util.toast
 import kotlin.coroutines.resume
@@ -99,7 +99,7 @@ class SubsLinkDialogState(
                 }
             }
         }
-        if (value != null && isLocalNetworkUrl(value) && !requestLocalNetworkPermission()) {
+        if (value != null && NetworkUtils.isLocalNetworkUrl(value) && !requestLocalNetworkPermission()) {
             return null
         }
         return value

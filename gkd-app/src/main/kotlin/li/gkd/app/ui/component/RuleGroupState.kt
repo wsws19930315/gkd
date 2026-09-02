@@ -22,7 +22,7 @@ import li.gkd.app.ui.UpsertRuleGroupRoute
 import li.gkd.app.ui.getGlobalGroupChecked
 import li.gkd.app.ui.style.scaffoldPadding
 import li.gkd.app.util.SubscriptionStore
-import li.gkd.app.util.getGroupEnable
+import li.gkd.app.util.SubsState
 import li.gkd.app.util.launchAsFn
 import li.gkd.app.util.launchTry
 import li.gkd.app.util.throttle
@@ -161,7 +161,7 @@ suspend fun batchUpdateGroupEnable(
         }
         val newSubsConfig = if (g.appId != null) {
             targetGroup as RawSubscription.RawAppGroup
-            val oldEnable = getGroupEnable(
+            val oldEnable = SubsState.getGroupEnable(
                 targetGroup,
                 subsConfig,
                 subscription.getCategory(targetGroup.name),
@@ -175,7 +175,7 @@ suspend fun batchUpdateGroupEnable(
                 groupKey = g.groupKey,
                 enable = enable
             ))
-            val newEnable = getGroupEnable(
+            val newEnable = SubsState.getGroupEnable(
                 targetGroup,
                 newSubsConfig,
                 subscription.getCategory(targetGroup.name),
@@ -223,11 +223,11 @@ suspend fun batchUpdateGroupEnable(
                     groupKey = g.groupKey,
                     enable = enable
                 ))
-                val oldEnable = getGroupEnable(
+                val oldEnable = SubsState.getGroupEnable(
                     targetGroup,
                     subsConfig,
                 )
-                val newEnable = getGroupEnable(targetGroup, newSubsConfig)
+                val newEnable = SubsState.getGroupEnable(targetGroup, newSubsConfig)
                 if (enable == newEnable && oldEnable == newEnable) {
                     return@map null
                 }

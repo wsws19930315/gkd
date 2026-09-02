@@ -47,7 +47,7 @@ import li.gkd.app.util.LogUtils
 import li.gkd.app.util.client
 import li.gkd.app.util.copyText
 import li.gkd.app.util.launchAsFn
-import li.gkd.app.util.openUri
+import li.gkd.app.util.IntentUtils
 import li.gkd.app.util.throttle
 
 @Serializable
@@ -133,7 +133,7 @@ fun WebViewPage(route: WebViewRoute) {
                             },
                             onClick = {
                                 expanded = false
-                                openUri(webView.value?.url ?: initUrl)
+                                IntentUtils.openUri(webView.value?.url ?: initUrl)
                             }
                         )
                     }
@@ -221,7 +221,7 @@ private class GkdWebViewClient() : AccompanistWebViewClient() {
             if (uri.scheme == "gkd") {
                 (view?.context as? MainActivity)?.mainVm?.handleGkdUri(uri)
             } else {
-                openUri(uri)
+                IntentUtils.openUri(uri)
             }
             return true
         }

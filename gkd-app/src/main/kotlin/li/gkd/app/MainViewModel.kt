@@ -55,14 +55,12 @@ import li.gkd.app.util.OnSimpleLife
 import li.gkd.app.util.ShortUrlSet
 import li.gkd.app.util.ThrottleTimer
 import li.gkd.app.util.UpdateStatus
-import li.gkd.app.util.appIconMapFlow
-import li.gkd.app.util.clearCache
-import li.gkd.app.util.crashFolder
-import li.gkd.app.util.crashTempFolder
+import li.gkd.app.util.AppInfoState
+import li.gkd.app.util.FolderUtils
 import li.gkd.app.util.findOption
 import li.gkd.app.util.json
 import li.gkd.app.util.launchTry
-import li.gkd.app.util.openWeChatScaner
+import li.gkd.app.util.IntentUtils
 import li.gkd.app.util.runMainPost
 import li.gkd.app.util.toast
 import li.songe.codeorigin.CallSite
@@ -237,7 +235,7 @@ class MainViewModel : BaseViewModel(), OnSimpleLife by DefaultSimpleLifeImpl() {
             }
 
             "invoke" -> when (uri.path) {
-                "/1" -> openWeChatScaner()
+                "/1" -> IntentUtils.openWeChatScaner()
                 else -> notFoundToast()
             }
 
@@ -326,10 +324,10 @@ class MainViewModel : BaseViewModel(), OnSimpleLife by DefaultSimpleLifeImpl() {
 
     init {
         // preload
-        appIconMapFlow.value
+        AppInfoState.appIconMapFlow.value
         scope.launchTry(Dispatchers.IO) {
             // 每次进入删除缓存
-            clearCache()
+            FolderUtils.clearCache()
         }
 
         if (termsAcceptedFlow.value && updateStatus?.canRecheck == true) {
@@ -338,7 +336,7 @@ class MainViewModel : BaseViewModel(), OnSimpleLife by DefaultSimpleLifeImpl() {
 
         scope.launchTry(Dispatchers.IO) {
             trimCrashDataFiles()
-            val list = (crashTempFolder.listFiles() ?: emptyArray()).mapNotNull {
+            val list = (FolderUtils.crashTempFolder.listFiles() ?: emptyArray()).mapNotNull {
                 try {
                     json.decodeFromString<CrashData>(it.readText())
                 } catch (e: Exception) {
@@ -346,9 +344,9 @@ class MainViewModel : BaseViewModel(), OnSimpleLife by DefaultSimpleLifeImpl() {
                     null
                 }
             }.sortedBy { -it.mtime }
-            crashTempFolder.deleteRecursively()
+            FolderUtils.crashTempFolder.deleteRecursively()
             val t = System.currentTimeMillis()
-            crashFolder.listFiles()?.filter {
+            FolderUtils.crashFolder.listFiles()?.filter {
                 val name = it.name
                 !list.any { f -> name == f.filename }
             }?.forEach {

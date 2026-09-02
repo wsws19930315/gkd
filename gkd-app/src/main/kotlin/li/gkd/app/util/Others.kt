@@ -153,9 +153,9 @@ object AppListString {
     fun encode(set: Set<String>, append: Boolean = false): String {
         val list = set.sorted()
         if (append) {
-            return list.sortedBy { id -> if (id in appInfoMapFlow.value) 0 else 1 }
+            return list.sortedBy { id -> if (id in AppInfoState.appInfoMapFlow.value) 0 else 1 }
                 .joinToString(separator = "\n\n", postfix = "\n\n") {
-                    val name = appInfoMapFlow.value[it]?.name
+                    val name = AppInfoState.appInfoMapFlow.value[it]?.name
                     if (name != null) {
                         "$it\n# $name"
                     } else {
@@ -197,7 +197,7 @@ fun runMainPost(delayMillis: Long = 0L, r: Runnable) {
 }
 
 fun getShareApkFile(): File {
-    return sharedDir.resolve("gkd-v${META.versionName}.apk").apply {
+    return FolderUtils.sharedDir.resolve("gkd-v${META.versionName}.apk").apply {
         File(app.packageCodePath).copyTo(this, overwrite = true)
     }
 }

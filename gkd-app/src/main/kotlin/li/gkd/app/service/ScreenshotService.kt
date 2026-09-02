@@ -14,7 +14,7 @@ import li.gkd.app.util.LogUtils
 import li.gkd.app.util.OnSimpleLife
 import li.gkd.app.util.componentName
 import li.gkd.app.util.runMainPost
-import li.gkd.app.util.stopServiceByClass
+import li.gkd.app.util.IntentUtils
 import kotlin.time.Duration.Companion.milliseconds
 
 class ScreenshotService : Service(), OnSimpleLife by DefaultSimpleLifeImpl() {
@@ -85,6 +85,6 @@ class ScreenshotService : Service(), OnSimpleLife by DefaultSimpleLifeImpl() {
             app.startForegroundService(intent)
         }
 
-        fun stop() = stopServiceByClass(ScreenshotService::class)
+        fun stop() = IntentUtils.stopServiceByClass(ScreenshotService::class)
     }
 }

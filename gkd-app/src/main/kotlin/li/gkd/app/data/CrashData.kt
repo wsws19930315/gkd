@@ -2,8 +2,7 @@ package li.gkd.app.data
 
 import kotlinx.serialization.Serializable
 import li.gkd.app.util.LogUtils
-import li.gkd.app.util.crashFolder
-import li.gkd.app.util.crashTempFolder
+import li.gkd.app.util.FolderUtils
 import li.gkd.app.util.format
 import li.gkd.app.util.json
 
@@ -26,22 +25,22 @@ data class CrashData(
     val filename get() = "gkd_crash-" + mtime.format("yyyyMMdd_HHmmss") + ".json"
     fun save() {
         val text = json.encodeToString(this)
-        crashFolder.resolve(filename).writeText(text)
-        crashTempFolder.resolve(filename).writeText(text)
+        FolderUtils.crashFolder.resolve(filename).writeText(text)
+        FolderUtils.crashTempFolder.resolve(filename).writeText(text)
         trimCrashDataFiles()
     }
 
     fun delete(): Boolean = listOf(
-        crashFolder.resolve(filename),
-        crashTempFolder.resolve(filename),
+        FolderUtils.crashFolder.resolve(filename),
+        FolderUtils.crashTempFolder.resolve(filename),
     ).map { file ->
         !file.exists() || file.delete()
     }.all { it }
 }
 
 fun deleteCrashDataList(): Boolean = listOf(
-    crashFolder,
-    crashTempFolder,
+    FolderUtils.crashFolder,
+    FolderUtils.crashTempFolder,
 ).flatMap { folder ->
     (folder.listFiles() ?: emptyArray()).filter { it.isFile }
 }.map { file ->
@@ -49,7 +48,7 @@ fun deleteCrashDataList(): Boolean = listOf(
 }.all { it }
 
 fun trimCrashDataFiles() {
-    listOf(crashFolder, crashTempFolder).forEach { folder ->
+    listOf(FolderUtils.crashFolder, FolderUtils.crashTempFolder).forEach { folder ->
         (folder.listFiles() ?: emptyArray())
             .filter { it.isFile }
             .sortedByDescending { it.name }
@@ -63,7 +62,7 @@ fun trimCrashDataFiles() {
 }
 
 fun loadCrashDataList(): List<CrashData> =
-    (crashFolder.listFiles() ?: emptyArray())
+    (FolderUtils.crashFolder.listFiles() ?: emptyArray())
         .filter { it.isFile }
         .mapNotNull { file ->
             try {

@@ -70,8 +70,7 @@ import li.gkd.app.ui.style.itemHorizontalPadding
 import li.gkd.app.ui.style.itemVerticalPadding
 import li.gkd.app.ui.style.surfaceCardColors
 import li.gkd.app.util.HOME_PAGE_URL
-import li.gkd.app.util.latestRecordDescFlow
-import li.gkd.app.util.latestRecordFlow
+import li.gkd.app.util.SubsState
 import li.gkd.app.util.launchTry
 import li.gkd.app.util.throttle
 
@@ -230,8 +229,8 @@ fun useDashboardPage(): ScaffoldExt {
                 },
             )
 
-            val latestRecord by latestRecordFlow.collectAsStateWithLifecycle()
-            val latestRecordDesc by latestRecordDescFlow.collectAsStateWithLifecycle()
+            val latestRecord by SubsState.latestRecordFlow.collectAsStateWithLifecycle()
+            val latestRecordDesc by SubsState.latestRecordDescFlow.collectAsStateWithLifecycle()
             TriggerOverviewCard(
                 subsStatus = subsStatus,
                 latestRecordDesc = latestRecordDesc,

@@ -8,7 +8,7 @@ import li.gkd.app.data.screenshotFile
 import li.gkd.app.snapshot.SnapshotStore
 import li.gkd.app.ui.share.BaseViewModel
 import li.gkd.app.util.ImageUtils
-import li.gkd.app.util.appInfoMapFlow
+import li.gkd.app.util.AppInfoState
 import li.gkd.db.Db
 import li.gkd.db.Snapshot
 import java.io.File
@@ -23,7 +23,7 @@ class SnapshotVm : BaseViewModel() {
 
     val uiState = combine(
         snapshotsFlow,
-        appInfoMapFlow,
+        AppInfoState.appInfoMapFlow,
     ) { snapshots, appInfoMap ->
         SnapshotUiState(
             snapshots = snapshots,

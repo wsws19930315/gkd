@@ -18,7 +18,7 @@ import li.gkd.app.permission.PermissionStates
 import li.gkd.app.ui.share.LocalMainViewModel
 import li.gkd.app.util.launchAsFn
 import li.gkd.app.util.throttle
-import li.gkd.app.util.updateAppMutex
+import li.gkd.app.util.AppInfoState
 
 @Composable
 fun QueryPkgAuthCard(
@@ -42,7 +42,7 @@ fun QueryPkgAuthCard(
             textAlign = TextAlign.Center,
         )
         TextButton(
-            enabled = !updateAppMutex.state.collectAsStateWithLifecycle().value,
+            enabled = !AppInfoState.updateAppMutex.state.collectAsStateWithLifecycle().value,
             onClick = throttle(fn = mainVm.scope.launchAsFn {
                 mainVm.permissionRequests.ensurePermissions(PermissionStates.queryPackages)
             })

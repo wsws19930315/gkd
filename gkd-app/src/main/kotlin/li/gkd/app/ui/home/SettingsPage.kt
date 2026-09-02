@@ -80,7 +80,7 @@ import li.gkd.app.util.AndroidTarget
 import li.gkd.app.util.DarkThemeOption
 import li.gkd.app.util.findOption
 import li.gkd.app.util.launchTry
-import li.gkd.app.util.openAppDetailsSettings
+import li.gkd.app.util.IntentUtils
 import li.gkd.app.util.throttle
 import li.gkd.app.util.toast
 import kotlin.time.Duration.Companion.milliseconds
@@ -643,7 +643,7 @@ private fun BlockA11yDialog(
                             imageVector = PerfIcon.OpenInNew,
                             onClickLabel = "打开应用详情页面",
                             onClick = {
-                                openAppDetailsSettings()
+                                IntentUtils.openAppDetailsSettings()
                             },
                         )
                         RequiredTextItem(

@@ -15,12 +15,10 @@ import li.gkd.db.Snapshot
 import li.gkd.db.Db
 import li.gkd.app.util.LogUtils
 import li.gkd.app.util.ZipUtils
-import li.gkd.app.util.appInfoMapFlow
-import li.gkd.app.util.clearCache
+import li.gkd.app.util.AppInfoState
+import li.gkd.app.util.FolderUtils
 import li.gkd.app.util.json
 import li.gkd.app.util.keepNullJson
-import li.gkd.app.util.sharedDir
-import li.gkd.app.util.snapshotFolder
 import li.gkd.app.util.webpLossyCompressFormat
 import java.io.File
 import java.io.FileOutputStream
@@ -29,7 +27,7 @@ import java.util.UUID
 
 object SnapshotStore {
     private val mutationMutex = Mutex()
-    private val fileLayout by lazy { SnapshotFileLayout(snapshotFolder) }
+    private val fileLayout by lazy { SnapshotFileLayout(FolderUtils.snapshotFolder) }
 
     fun snapshotFile(id: Long): File = fileLayout.committed(id).snapshotFile
 
@@ -71,7 +69,7 @@ object SnapshotStore {
 
     suspend fun deleteAll() = mutationMutex.withLock {
         withContext(Dispatchers.IO) {
-            snapshotFolder.listFiles()?.forEach { file ->
+            FolderUtils.snapshotFolder.listFiles()?.forEach { file ->
                 file.deleteRecursivelyOrThrow()
             }
             Db.snapshotDao.deleteAll()
@@ -129,7 +127,7 @@ object SnapshotStore {
         mutationMutex.withLock {
             withContext(Dispatchers.IO) {
                 val filename = if (appId != null) {
-                    val appName = appInfoMapFlow.value[appId]?.name
+                    val appName = AppInfoState.appInfoMapFlow.value[appId]?.name
                         ?.filterNot { char -> char in "\\/:*?\"<>|" || char <= ' ' }
                     if (activityId != null) {
                         "${(appName ?: appId).take(20)}_${
@@ -142,8 +140,8 @@ object SnapshotStore {
                     "${snapshotId}.zip"
                 }
                 require(File(filename).name == filename) { "无效压缩包名称" }
-                clearCache()
-                val outputDirectory = sharedDir.resolve(
+                FolderUtils.clearCache()
+                val outputDirectory = FolderUtils.sharedDir.resolve(
                     "snapshot-$snapshotId-${UUID.randomUUID()}"
                 )
                 if (!outputDirectory.mkdirs()) {
@@ -174,7 +172,7 @@ object SnapshotStore {
 
     suspend fun deleteArchive(file: File) = withContext(NonCancellable + Dispatchers.IO) {
         val directory = file.parentFile ?: return@withContext
-        if (directory.parentFile != sharedDir || !directory.name.startsWith("snapshot-")) {
+        if (directory.parentFile != FolderUtils.sharedDir || !directory.name.startsWith("snapshot-")) {
             return@withContext
         }
         if (directory.exists() && !directory.deleteRecursively()) {

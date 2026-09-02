@@ -13,12 +13,10 @@ import li.gkd.app.ui.share.BaseViewModel
 import li.gkd.app.ui.share.useAppFilter
 import li.gkd.app.util.AppSortOption
 import li.gkd.app.util.RuleSummary
-import li.gkd.app.util.appListAuthAbnormalFlow
+import li.gkd.app.util.AppInfoState
 import li.gkd.app.util.findOption
-import li.gkd.app.util.ruleSummaryFlow
+import li.gkd.app.util.SubsState
 import li.gkd.app.util.switchItem
-import li.gkd.app.util.updateAllAppInfo
-import li.gkd.app.util.updateAppMutex
 
 data class AppListUiState(
     val appInfos: List<AppInfo>,
@@ -96,7 +94,7 @@ class AppListVm(mainVm: MainViewModel) : BaseViewModel() {
         appFilter.appListFlow,
         appFilter.searchStrFlow,
         appFilter.showAllAppFlow,
-        ruleSummaryFlow,
+        SubsState.ruleSummaryFlow,
         blockMatchAppListFlow,
     ) { appInfos, searchText, showAllApps, ruleSummary, whiteListAppIds ->
         AppListContentState(
@@ -109,8 +107,8 @@ class AppListVm(mainVm: MainViewModel) : BaseViewModel() {
     }
     private val environment = combine(
         PermissionStates.queryPackages.stateFlow,
-        appListAuthAbnormalFlow,
-        updateAppMutex.state,
+        AppInfoState.appListAuthAbnormalFlow,
+        AppInfoState.updateAppMutex.state,
     ) { canQueryPackages, queryPackagesAbnormal, refreshing ->
         AppListEnvironment(
             canQueryPackages = canQueryPackages,
@@ -131,13 +129,13 @@ class AppListVm(mainVm: MainViewModel) : BaseViewModel() {
                 appInfos = appFilter.appListFlow.value,
                 searchText = appFilter.searchStrFlow.value,
                 showAllApps = appFilter.showAllAppFlow.value,
-                ruleSummary = ruleSummaryFlow.value,
+                ruleSummary = SubsState.ruleSummaryFlow.value,
                 whiteListAppIds = blockMatchAppListFlow.value,
             ),
             environment = AppListEnvironment(
                 canQueryPackages = PermissionStates.queryPackages.stateFlow.value,
-                queryPackagesAbnormal = appListAuthAbnormalFlow.value,
-                refreshing = updateAppMutex.state.value,
+                queryPackagesAbnormal = AppInfoState.appListAuthAbnormalFlow.value,
+                refreshing = AppInfoState.updateAppMutex.state.value,
             ),
         ),
     )
@@ -207,6 +205,6 @@ class AppListVm(mainVm: MainViewModel) : BaseViewModel() {
     }
 
     fun refresh() {
-        updateAllAppInfo()
+        AppInfoState.updateAllAppInfo()
     }
 }

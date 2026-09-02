@@ -29,9 +29,8 @@ import li.gkd.app.ui.share.Loadable
 import li.gkd.app.util.RuleSortOption
 import li.gkd.app.util.SubscriptionStore
 import li.gkd.app.util.UsedSubsEntry
-import li.gkd.app.util.appInfoMapFlow
-import li.gkd.app.util.buildSubsEntries
-import li.gkd.app.util.buildUsedSubsEntries
+import li.gkd.app.util.AppInfoState
+import li.gkd.app.util.SubsState
 import li.gkd.app.util.collator
 import li.gkd.app.util.findOption
 import li.gkd.app.util.toJson5String
@@ -83,8 +82,8 @@ class AppConfigVm(val route: AppConfigRoute) : BaseViewModel() {
                 val appUsedSubsIds = usedSubsIds.filter { id ->
                     appConfigs.find { it.subsId == id }?.enable != false
                 }
-                val entries = buildUsedSubsEntries(
-                    buildSubsEntries(items, snapshotState.value.subscriptions)
+                val entries = SubsState.buildUsedSubsEntries(
+                    SubsState.buildSubsEntries(items, snapshotState.value.subscriptions)
                 )
                 appUsedSubsIds to entries
             }.distinctUntilChanged().flatMapLatest { (usedSubsIds, entries) ->
@@ -270,7 +269,7 @@ class AppConfigVm(val route: AppConfigRoute) : BaseViewModel() {
             toJson5String(
                 RawSubscription.RawApp(
                     id = route.appId,
-                    name = appInfoMapFlow.value[route.appId]?.name,
+                    name = AppInfoState.appInfoMapFlow.value[route.appId]?.name,
                     groups = groups,
                 )
             )

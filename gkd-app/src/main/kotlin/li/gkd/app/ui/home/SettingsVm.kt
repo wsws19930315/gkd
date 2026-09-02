@@ -13,8 +13,7 @@ import li.gkd.app.store.actionCountFlow
 import li.gkd.app.store.storeFlow
 import li.gkd.app.ui.share.BaseViewModel
 import li.gkd.app.util.BackupUtils
-import li.gkd.app.util.getSubsStatus
-import li.gkd.app.util.ruleSummaryFlow
+import li.gkd.app.util.SubsState
 import java.io.File
 
 class SettingsVm : BaseViewModel() {
@@ -56,9 +55,9 @@ class SettingsVm : BaseViewModel() {
         toastSettingsDialogVisibleFlow.value = visible
     }
 
-    val subsStatusFlow = combine(ruleSummaryFlow, actionCountFlow) { ruleSummary, count ->
-        getSubsStatus(ruleSummary, count)
-    }.stateInit(getSubsStatus(ruleSummaryFlow.value, actionCountFlow.value))
+    val subsStatusFlow = combine(SubsState.ruleSummaryFlow, actionCountFlow) { ruleSummary, count ->
+        SubsState.getSubsStatus(ruleSummary, count)
+    }.stateInit(SubsState.getSubsStatus(SubsState.ruleSummaryFlow.value, actionCountFlow.value))
 
     fun saveActionToast(value: String): Boolean {
         if (value == storeFlow.value.actionToast) return false

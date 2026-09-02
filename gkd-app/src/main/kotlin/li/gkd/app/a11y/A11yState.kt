@@ -28,10 +28,10 @@ import li.gkd.app.store.actionCountFlow
 import li.gkd.app.store.checkAppBlockMatch
 import li.gkd.app.util.AndroidTarget
 import li.gkd.app.util.LogUtils
-import li.gkd.app.util.PKG_FLAGS
+import li.gkd.app.util.AppInfoState
 import li.gkd.app.util.RuleSummary
 import li.gkd.app.util.launchTry
-import li.gkd.app.util.ruleSummaryFlow
+import li.gkd.app.util.SubsState
 import li.gkd.app.util.systemUiAppId
 import li.songe.codeorigin.CallSite
 
@@ -80,7 +80,7 @@ private object ActivityCache : LruCache<Pair<String, String>, Boolean>(256) {
     override fun create(key: Pair<String, String>): Boolean = try {
         app.packageManager.getActivityInfo(
             ComponentName(key.first, key.second),
-            PKG_FLAGS
+            AppInfoState.PKG_FLAGS
         )
         true
     } catch (_: PackageManager.NameNotFoundException) {
@@ -195,7 +195,7 @@ fun updateTopActivity(
         appScope.launchTry { Db.activityLogDao.deleteKeepLatest() }
     }
     val topActivity = topActivityFlow.value
-    val ruleSummary = ruleSummaryFlow.value
+    val ruleSummary = SubsState.ruleSummaryFlow.value
     val topChanged = idChanged || oldActivityRule.topActivity != topActivity
     val ruleChanged = oldActivityRule.ruleSummary !== ruleSummary
     if (topChanged || ruleChanged) {

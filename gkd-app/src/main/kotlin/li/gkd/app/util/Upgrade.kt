@@ -98,7 +98,7 @@ class UpdateStatus(val scope: CoroutineScope) {
     private fun startDownload(newVersion: NewVersion) {
         if (downloadStatusFlow.value is LoadStatus.Loading) return
         downloadStatusFlow.value = LoadStatus.Loading(0f)
-        val apkFile = sharedDir.resolve("gkd-v${newVersion.versionCode}.apk").apply {
+        val apkFile = FolderUtils.sharedDir.resolve("gkd-v${newVersion.versionCode}.apk").apply {
             if (exists()) {
                 delete()
             }

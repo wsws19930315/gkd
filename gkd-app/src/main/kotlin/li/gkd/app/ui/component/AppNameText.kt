@@ -25,7 +25,7 @@ import androidx.compose.ui.text.withStyle
 import li.gkd.app.data.AppInfo
 import li.gkd.app.data.otherUserMapFlow
 import li.gkd.app.priv.currentUserId
-import li.gkd.app.util.appInfoMapFlow
+import li.gkd.app.util.AppInfoState
 
 @Composable
 fun AppNameText(
@@ -36,7 +36,7 @@ fun AppNameText(
     style: TextStyle = LocalTextStyle.current,
     color: Color = Color.Unspecified,
 ) {
-    val info = appInfo ?: appInfoMapFlow.collectAsStateWithLifecycle().value[appId]
+    val info = appInfo ?: AppInfoState.appInfoMapFlow.collectAsStateWithLifecycle().value[appId]
     val showSystemIcon = info?.isSystem == true
     val appName = (info?.name ?: fallbackName ?: appId ?: error("appId is required"))
     val userName = info?.userId?.let { userId ->

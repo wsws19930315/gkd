@@ -43,7 +43,7 @@ object BackupUtils {
         )
 
     suspend fun exportBackUpData(): File {
-        val tempDir = createGkdTempDir()
+        val tempDir = FolderUtils.createGkdTempDir()
         tempDir.resolve("store").run {
             mkdir()
             backupStoreFlowList.forEach { storeFlow ->
@@ -66,7 +66,7 @@ object BackupUtils {
                 resolve("${subs.id}.json").writeText(json.encodeToString(subs))
             }
         }
-        val file = sharedDir.resolve("gkd-backup-${System.currentTimeMillis()}.zip")
+        val file = FolderUtils.sharedDir.resolve("gkd-backup-${System.currentTimeMillis()}.zip")
         ZipUtils.zipFiles(tempDir.listFiles()!!.filterNotNull(), file)
         tempDir.deleteRecursively()
         return file
@@ -74,7 +74,7 @@ object BackupUtils {
 
     suspend fun importBackUpData(uri: Uri) {
         toast("导入备份中...")
-        val tempDir = createGkdTempDir()
+        val tempDir = FolderUtils.createGkdTempDir()
         try {
             val zipFile = tempDir.resolve("file.zip").apply {
                 writeBytes(UriUtils.uri2Bytes(uri))

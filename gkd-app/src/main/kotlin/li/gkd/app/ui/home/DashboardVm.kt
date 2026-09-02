@@ -6,14 +6,13 @@ import li.gkd.app.service.StatusService
 import li.gkd.app.store.actionCountFlow
 import li.gkd.app.store.storeFlow
 import li.gkd.app.ui.share.BaseViewModel
-import li.gkd.app.util.getSubsStatus
-import li.gkd.app.util.ruleSummaryFlow
+import li.gkd.app.util.SubsState
 
 class DashboardVm : BaseViewModel() {
 
-    val subsStatusFlow = combine(ruleSummaryFlow, actionCountFlow) { ruleSummary, count ->
-        getSubsStatus(ruleSummary, count)
-    }.stateInit(getSubsStatus(ruleSummaryFlow.value, actionCountFlow.value))
+    val subsStatusFlow = combine(SubsState.ruleSummaryFlow, actionCountFlow) { ruleSummary, count ->
+        SubsState.getSubsStatus(ruleSummary, count)
+    }.stateInit(SubsState.getSubsStatus(SubsState.ruleSummaryFlow.value, actionCountFlow.value))
 
     fun stopStatusService() {
         StatusService.stop()

@@ -49,7 +49,7 @@ import li.gkd.app.ui.style.EmptyHeight
 import li.gkd.app.ui.style.scaffoldPadding
 import li.gkd.app.util.AppGroupOption
 import li.gkd.app.util.AppSortOption
-import li.gkd.app.util.appInfoMapFlow
+import li.gkd.app.util.AppInfoState
 import li.gkd.app.util.findOption
 import li.gkd.app.util.launchTry
 import li.gkd.app.util.throttle
@@ -71,7 +71,7 @@ fun SubsAppListPage(route: SubsAppListRoute) {
     val loadableState by vm.uiState.collectAsStateWithLifecycle()
     val appConfigMapState by vm.appConfigMapState.collectAsStateWithLifecycle()
     val enableSizeMapState by vm.enableSizeMapState.collectAsStateWithLifecycle()
-    val appInfoMap by appInfoMapFlow.collectAsStateWithLifecycle()
+    val appInfoMap by AppInfoState.appInfoMapFlow.collectAsStateWithLifecycle()
     val store by storeFlow.collectAsStateWithLifecycle()
     val state = loadableState.value
     val firstLoading = loadableState is Loadable.Loading

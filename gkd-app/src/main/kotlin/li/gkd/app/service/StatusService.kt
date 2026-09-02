@@ -23,11 +23,9 @@ import li.gkd.app.store.storeFlow
 import li.gkd.app.util.DefaultSimpleLifeImpl
 import li.gkd.app.util.OnSimpleLife
 import li.gkd.app.util.RuleSummary
-import li.gkd.app.util.appInfoMapFlow
-import li.gkd.app.util.getSubsStatus
-import li.gkd.app.util.ruleSummaryFlow
-import li.gkd.app.util.startForegroundServiceByClass
-import li.gkd.app.util.stopServiceByClass
+import li.gkd.app.util.AppInfoState
+import li.gkd.app.util.SubsState
+import li.gkd.app.util.IntentUtils
 import kotlin.time.Duration.Companion.milliseconds
 
 class StatusService : Service(), OnSimpleLife by DefaultSimpleLifeImpl() {
@@ -41,7 +39,7 @@ class StatusService : Service(), OnSimpleLife by DefaultSimpleLifeImpl() {
         val abRunning = A11yService.isRunning.value
         val automationRunning = uiAutomationFlow.value != null
         val store = storeFlow.value
-        val ruleSummary = ruleSummaryFlow.value
+        val ruleSummary = SubsState.ruleSummaryFlow.value
         val count = actionCountFlow.value
         val privilegeServiceStatus = privilegeServiceStatusFlow.value
         val title = if (store.useCustomNotifText) {
@@ -60,7 +58,7 @@ class StatusService : Service(), OnSimpleLife by DefaultSimpleLifeImpl() {
                 } else if (PermissionStates.writeSecureSettings.updateAndGet()) {
                     if (store.enableAutomator && store.enableBlockA11yAppList && a11yPartDisabledFlow.value) {
                         val name =
-                            appInfoMapFlow.value[topAppIdFlow.value]?.name ?: topAppIdFlow.value
+                            AppInfoState.appInfoMapFlow.value[topAppIdFlow.value]?.name ?: topAppIdFlow.value
                         "局部关闭 · $name"
                     } else {
                         "无障碍已关闭"
@@ -73,7 +71,7 @@ class StatusService : Service(), OnSimpleLife by DefaultSimpleLifeImpl() {
                 val text =
                     if (store.enableAutomator && store.enableBlockA11yAppList && a11yPartDisabledFlow.value) {
                         val name =
-                            appInfoMapFlow.value[topAppIdFlow.value]?.name ?: topAppIdFlow.value
+                            AppInfoState.appInfoMapFlow.value[topAppIdFlow.value]?.name ?: topAppIdFlow.value
                         "局部关闭 · $name"
                     } else {
                         "自动化已关闭"
@@ -89,7 +87,7 @@ class StatusService : Service(), OnSimpleLife by DefaultSimpleLifeImpl() {
                 defaultStatusNotification.uri
             )
         } else {
-            Triple(title, getSubsStatus(ruleSummary, count), defaultStatusNotification.uri)
+            Triple(title, SubsState.getSubsStatus(ruleSummary, count), defaultStatusNotification.uri)
         }
     }
 
@@ -106,7 +104,7 @@ class StatusService : Service(), OnSimpleLife by DefaultSimpleLifeImpl() {
                     A11yService.isRunning,
                     uiAutomationFlow,
                     storeFlow,
-                    ruleSummaryFlow,
+                    SubsState.ruleSummaryFlow,
                     privilegeServiceStatusFlow,
                     a11yServiceEnabledFlow,
                     PermissionStates.writeSecureSettings.stateFlow,
@@ -144,8 +142,8 @@ class StatusService : Service(), OnSimpleLife by DefaultSimpleLifeImpl() {
                     && PermissionStates.notification.updateAndGet()
                     && PermissionStates.foregroundServiceSpecialUse.updateAndGet()
 
-        fun start() = startForegroundServiceByClass(StatusService::class)
-        fun stop() = stopServiceByClass(StatusService::class)
+        fun start() = IntentUtils.startForegroundServiceByClass(StatusService::class)
+        fun stop() = IntentUtils.stopServiceByClass(StatusService::class)
         suspend fun requestStart(mainVm: MainViewModel) {
             if (
                 !mainVm.permissionRequests.ensurePermissions(

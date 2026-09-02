@@ -17,7 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.withContext
 import li.gkd.app.MainActivity
-import li.gkd.app.util.buildLogFile
+import li.gkd.app.util.FolderUtils
 import li.gkd.app.util.launchTry
 import li.gkd.app.util.throttle
 
@@ -38,7 +38,7 @@ class ShareLogState(
     private fun share(context: MainActivity) {
         dismiss()
         scope.launchTry {
-            val logZipFile = withContext(Dispatchers.IO) { buildLogFile() }
+            val logZipFile = withContext(Dispatchers.IO) { FolderUtils.buildLogFile() }
             context.shareFile(logZipFile, "分享日志文件")
         }
     }
@@ -46,7 +46,7 @@ class ShareLogState(
     private fun save(context: MainActivity) {
         dismiss()
         scope.launchTry {
-            val logZipFile = withContext(Dispatchers.IO) { buildLogFile() }
+            val logZipFile = withContext(Dispatchers.IO) { FolderUtils.buildLogFile() }
             context.saveFileToDownloads(logZipFile)
         }
     }
@@ -54,7 +54,7 @@ class ShareLogState(
     private fun upload() {
         dismiss()
         githubUpload.startTask(
-            getFile = { buildLogFile() },
+            getFile = { FolderUtils.buildLogFile() },
             showHref = { "http://i.gkd.li/log/${it.id}" },
         )
     }

@@ -17,6 +17,12 @@
 
 - `companion object` 或 `object` 中由 `object`/`data object` 单例组成的列表、集合、映射及其排序结果必须使用 `by lazy` 初始化；禁止在静态初始化阶段直接构造这类集合，以避免 JVM、JS 和 Wasm 上的循环初始化。
 
+## Kotlin 工具声明
+
+- `gkd-app` 的 `util` 包中，新增或修改的跨文件工具函数和共享工具属性必须声明为与文件名同名的 `object` 成员；扩展函数、类型声明以及仅供文件内部使用的 `private` 实现可以保留为顶级声明。
+- `XxxExt.kt` 文件只允许放置扩展声明；普通工具函数和共享工具属性必须移入对应的 `XxxUtils.kt` 或职责明确的同名 `object`。
+- Compose 页面、组件及其私有 Composable 不适用上述工具声明规则。
+
 ## Compose 与状态边界
 
 - 除悬浮窗 Compose 外，应用 Compose 树中的 Composable 都可以通过 `LocalMainViewModel` 获取 `mainVm`，无需逐层转发导航、全局弹窗、打开 URL 等应用级操作。

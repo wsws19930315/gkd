@@ -51,7 +51,7 @@ import li.gkd.app.ui.style.EmptyHeight
 import li.gkd.app.ui.style.iconTextSize
 import li.gkd.app.ui.style.itemHorizontalPadding
 import li.gkd.app.ui.style.scaffoldPadding
-import li.gkd.app.util.appInfoMapFlow
+import li.gkd.app.util.AppInfoState
 import li.gkd.app.util.launchTry
 import li.gkd.app.util.throttle
 import li.gkd.app.util.toast
@@ -127,7 +127,7 @@ fun ActivityLogPage() {
                         onShowDetails = {
                             mainVm.textDialog.showText(
                                 listOfNotNull(
-                                    appInfoMapFlow.value[actionLog.appId]?.name,
+                                    AppInfoState.appInfoMapFlow.value[actionLog.appId]?.name,
                                     actionLog.appId,
                                     actionLog.showActivityId,
                                 ).joinToString("\n"),

@@ -35,7 +35,7 @@ import li.gkd.db.SubsConfig
 import li.gkd.app.ui.getGlobalGroupChecked
 import li.gkd.app.ui.icon.ResetSettings
 import li.gkd.app.ui.share.noRippleClickable
-import li.gkd.app.util.getGroupEnable
+import li.gkd.app.util.SubsState
 import li.gkd.app.util.throttle
 import java.util.Objects
 
@@ -95,7 +95,7 @@ fun RuleGroupCard(
             appId,
         )
     } else {
-        getGroupEnable(
+        SubsState.getGroupEnable(
             group,
             subsConfig,
             category,
@@ -245,7 +245,7 @@ fun getActualGroupChecked(
             appId,
         )
     } else {
-        getGroupEnable(
+        SubsState.getGroupEnable(
             group,
             subsConfig,
             subs.getCategory(group.name),

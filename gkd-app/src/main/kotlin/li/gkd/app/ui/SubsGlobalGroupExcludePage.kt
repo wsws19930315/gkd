@@ -75,7 +75,7 @@ import li.gkd.app.util.AppGroupOption
 import li.gkd.app.util.AppSortOption
 import li.gkd.app.util.findOption
 import li.gkd.app.util.launchTry
-import li.gkd.app.util.systemAppsFlow
+import li.gkd.app.util.AppInfoState
 import li.gkd.app.util.throttle
 import li.gkd.app.util.toast
 
@@ -379,7 +379,7 @@ fun getGlobalGroupChecked(
     if (appId == launcherAppId) {
         return group.matchLauncher ?: false
     }
-    if (systemAppsFlow.value.contains(appId)) {
+    if (AppInfoState.systemAppsFlow.value.contains(appId)) {
         return group.matchSystemApp ?: false
     }
     return group.matchAnyApp ?: true

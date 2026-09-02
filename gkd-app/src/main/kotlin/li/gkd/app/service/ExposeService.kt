@@ -12,7 +12,7 @@ import li.gkd.app.snapshot.SnapshotCapture
 import li.gkd.app.util.componentName
 import li.gkd.app.util.launchTry
 import li.gkd.app.util.runMainPost
-import li.gkd.app.util.shFolder
+import li.gkd.app.util.FolderUtils
 import li.gkd.app.util.toast
 
 class ExposeService : Service() {
@@ -55,7 +55,7 @@ class ExposeService : Service() {
         fun initCommandFile() {
             val commandText = template
                 .replace("{service}", ExposeService::class.componentName.flattenToShortString())
-            shFolder.resolve("expose.sh").writeText(commandText)
+            FolderUtils.shFolder.resolve("expose.sh").writeText(commandText)
         }
 
         fun exposeIntent(expose: Int, data: String? = null): Intent {
