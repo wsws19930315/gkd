@@ -8,6 +8,7 @@ import li.gkd.app.data.RawSubscription
 import li.gkd.app.data.ruleconfig.RuleGroupConfigService
 import li.gkd.app.data.edit
 import li.gkd.app.domain.rule.toRuleGroupTarget
+import li.gkd.app.util.MutexState
 import li.gkd.app.ui.share.BaseViewModel
 import li.gkd.app.core.state.Loadable
 import li.gkd.app.appInfoRepository
@@ -22,6 +23,13 @@ data class SubsGlobalGroupListUiState(
 class SubsGlobalGroupListVm(
     val route: SubsGlobalGroupListRoute,
 ) : BaseViewModel() {
+    private val batchMutex = MutexState()
+    val batchBusyFlow: StateFlow<Boolean> get() = batchMutex.state
+
+    suspend fun runBatchAction(action: suspend () -> Unit) {
+        batchMutex.tryWithStateLock(action)
+    }
+
     private val subscription = requiredSubscription(route.subsItemId)
 
     private val subsConfigsFlow =
@@ -89,10 +97,14 @@ class SubsGlobalGroupListVm(
         )
     }
 
-    suspend fun deleteSelectedGroups(selectedKeys: Set<Int>) {
+    suspend fun deleteSelectedGroups(selectedKeys: Set<Int>): Int {
+        check(route.subsItemId < 0) { "远程订阅规则不可删除" }
+        var deletedSize = 0
         subscription.update { current ->
-            current.edit { removeGlobalGroups { it.key in selectedKeys } }
+            current.edit {
+                deletedSize = removeGlobalGroups { it.key in selectedKeys }.size
+            }
         }
-        Db.subsGlobalGroupConfigDao.deleteGroups(route.subsItemId, selectedKeys.toList())
+        return deletedSize
     }
 }

@@ -212,7 +212,10 @@ object SubscriptionRepository {
                     ))
                 }
                 LogUtils.d("deleteSubscription", deletion.ids)
-                result = SubscriptionResult.Success(SubscriptionResult.SuccessKind.Deleted)
+                result = SubscriptionResult.Success(
+                    kind = SubscriptionResult.SuccessKind.Deleted,
+                    count = deletion.count,
+                )
             }
             result
         }

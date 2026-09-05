@@ -21,6 +21,7 @@ import li.gkd.app.store.settingsRepository
 import li.gkd.app.domain.rule.RuleGroupTarget
 import li.gkd.app.domain.rule.RuleGroupPolicy
 import li.gkd.app.a11y.launcherAppId
+import li.gkd.app.util.MutexState
 import li.gkd.app.ui.share.BaseViewModel
 import li.gkd.app.core.state.Loadable
 import li.gkd.app.util.RuleSortOption
@@ -67,6 +68,13 @@ private data class AppConfigSortState(
 class AppConfigVm(
     val route: AppConfigRoute,
 ) : BaseViewModel() {
+    private val batchMutex = MutexState()
+    val batchBusyFlow: StateFlow<Boolean> get() = batchMutex.state
+
+    suspend fun runBatchAction(action: suspend () -> Unit) {
+        batchMutex.tryWithStateLock(action)
+    }
+
     fun setRuleSortType(option: RuleSortOption) {
         settingsRepository.updateSettings { it.copy(appRuleSort = option.value) }
     }
@@ -278,6 +286,7 @@ class AppConfigVm(
                     Triple(entry.subsItem.id, RuleGroupType.App, group.key) in selectedKeys
                 }
             }
+            check(groups.isNotEmpty()) { "所选规则已变化，无可复制的应用规则" }
             toJson5String(
                 RawSubscription.RawApp(
                     id = route.appId,

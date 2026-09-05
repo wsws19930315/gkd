@@ -10,6 +10,7 @@ import li.gkd.app.data.RawSubscription
 import li.gkd.app.data.ruleconfig.RuleGroupConfigService
 import li.gkd.app.data.edit
 import li.gkd.app.domain.rule.toRuleGroupTarget
+import li.gkd.app.util.MutexState
 import li.gkd.app.ui.share.BaseViewModel
 import li.gkd.app.core.state.Loadable
 import li.gkd.app.util.toJson5String
@@ -32,6 +33,13 @@ data class SubsAppGroupListUiState(
 class SubsAppGroupListVm(
     val route: SubsAppGroupListRoute,
 ) : BaseViewModel() {
+    private val batchMutex = MutexState()
+    val batchBusyFlow: StateFlow<Boolean> get() = batchMutex.state
+
+    suspend fun runBatchAction(action: suspend () -> Unit) {
+        batchMutex.tryWithStateLock(action)
+    }
+
 
     private val subscription = requiredSubscription(route.subsItemId)
 
@@ -86,9 +94,11 @@ class SubsAppGroupListVm(
     suspend fun buildSelectedGroupsText(selectedKeys: Set<Int>): String =
         withContext(Dispatchers.Default) {
             val app = uiState.value.value?.app ?: error("订阅应用尚未加载")
+            val groups = app.groups.filter { it.key in selectedKeys }
+            check(groups.isNotEmpty()) { "所选规则已变化，无可复制规则" }
             toJson5String(
                 app.copy(
-                    groups = app.groups.filter { it.key in selectedKeys },
+                    groups = groups,
                 ),
             )
         }
@@ -123,6 +133,7 @@ class SubsAppGroupListVm(
     }
 
     suspend fun deleteSelectedGroups(selectedKeys: Set<Int>): Int {
+        check(route.subsItemId < 0) { "远程订阅规则不可删除" }
         var deletedSize = 0
         subscription.update { current ->
             current.edit {

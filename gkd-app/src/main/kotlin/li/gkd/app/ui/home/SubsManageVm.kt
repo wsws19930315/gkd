@@ -14,6 +14,7 @@ import li.gkd.app.data.RawSubscription
 import li.gkd.db.SubsItem
 import li.gkd.app.store.storeFlow
 import li.gkd.app.store.settingsRepository
+import li.gkd.app.util.MutexState
 import li.gkd.app.ui.share.BaseViewModel
 import li.gkd.app.core.state.Loadable
 import li.gkd.app.data.subscription.SubscriptionResult
@@ -23,6 +24,7 @@ import li.gkd.app.ui.share.launchUi
 import li.gkd.app.ui.share.message
 import li.gkd.app.util.ToastUtils.toast
 import li.gkd.db.Db
+import li.gkd.db.LOCAL_SUBS_ID
 
 data class SubsManageUiState(
     val subItems: List<SubsItem>,
@@ -45,6 +47,13 @@ private fun buildSubsManageUiState(
 )
 
 class SubsManageVm : BaseViewModel() {
+    private val batchMutex = MutexState()
+    val batchBusyFlow: StateFlow<Boolean> get() = batchMutex.state
+
+    suspend fun runBatchAction(action: suspend () -> Unit) {
+        batchMutex.tryWithStateLock(action)
+    }
+
     val settingsDialogVisibleFlow: StateFlow<Boolean>
         field = MutableStateFlow(false)
     val powerWarningItemFlow: StateFlow<SubsItem?>
@@ -92,7 +101,7 @@ class SubsManageVm : BaseViewModel() {
     }
 
     suspend fun deleteSubscriptions(ids: Set<Long>): SubscriptionResult =
-        subscriptionRepository.delete(*ids.toLongArray())
+        subscriptionRepository.delete(*(ids - LOCAL_SUBS_ID).toLongArray())
 
     fun updateOrder(items: List<SubsItem>) {
         scope.launchUi(Dispatchers.IO) {
