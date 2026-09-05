@@ -25,7 +25,6 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.unit.dp
 import androidx.core.animation.doOnEnd
-import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.savedstate.SavedStateRegistryController
@@ -52,30 +51,31 @@ import li.gkd.app.ui.icon.DragPan
 import li.gkd.app.ui.style.AppTheme
 import li.gkd.app.ui.style.iconTextSize
 import li.gkd.app.util.BarUtils
-import li.gkd.app.util.DefaultSimpleLifeImpl
-import li.gkd.app.util.OnSimpleLife
 import li.gkd.app.util.ScreenUtils
 import li.gkd.app.util.mapState
 import li.gkd.app.util.px
 import li.gkd.app.util.runMainPost
 import li.gkd.app.util.throttle
-import li.gkd.app.util.toast
+import li.gkd.app.util.ToastUtils.toast
 import kotlin.coroutines.resume
 import kotlin.math.abs
 import kotlin.time.Duration.Companion.milliseconds
 
 private var tempShareContext: ShareContext? = null
-private fun OverlayWindowService.useShareContext(): ShareContext {
+private fun acquireShareContext(): ShareContextLease {
     val shareContext = tempShareContext ?: ShareContext().apply { tempShareContext = this }
     shareContext.count++
-    onDestroyed {
-        shareContext.count--
-        if (shareContext.count == 0) {
-            shareContext.scope.cancel()
+    return ShareContextLease(shareContext)
+}
+
+private class ShareContextLease(val context: ShareContext) : AutoCloseable {
+    override fun close() {
+        context.count--
+        if (context.count == 0) {
+            context.scope.cancel()
             tempShareContext = null
         }
     }
-    return shareContext
 }
 
 private class ShareContext {
@@ -112,33 +112,22 @@ private class ShareContext {
 }
 
 abstract class OverlayWindowService(
-    val positionKey: String,
-) : LifecycleService(), SavedStateRegistryOwner, OnSimpleLife by DefaultSimpleLifeImpl() {
+    private val positionKey: String,
+) : LifecycleHookService(), SavedStateRegistryOwner {
     companion object {
         private var aliveSize = 0
         val isAnyAlive: Boolean
             get() = aliveSize > 0
     }
 
-    override fun onCreate() {
-        super.onCreate()
-        onCreated()
-    }
-
-    override val scope get() = lifecycleScope
-
     private val resizeFlow = MutableSharedFlow<Unit>()
 
     override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
         lifecycleScope.launch { resizeFlow.emit(Unit) }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        onDestroyed()
-    }
-
-    val registryController = SavedStateRegistryController.create(this).apply {
+    private val registryController = SavedStateRegistryController.create(this).apply {
         performAttach()
         performRestore(null)
     }
@@ -235,165 +224,174 @@ abstract class OverlayWindowService(
     private val minMargin get() = 10.dp.px.toInt()
     private val defaultPosition get() = listOf(minMargin, BarUtils.getStatusBarHeight())
 
-    private val shareContext = useShareContext()
+    private lateinit var shareContext: ShareContext
 
-    private val positionFlow = MutableStateFlow(
-        shareContext.positionMapFlow.value[positionKey].let {
-            if (it != null && it.size >= 2) {
-                it
-            } else {
-                defaultPosition
+    private val positionFlow by lazy {
+        MutableStateFlow(
+            shareContext.positionMapFlow.value[positionKey].let {
+                if (it != null && it.size >= 2) {
+                    it
+                } else {
+                    defaultPosition
+                }
             }
-        }
-    )
+        )
+    }
 
     init {
-        aliveSize++
-        onDestroyed {
-            runMainPost(1000) { aliveSize-- }
+        useStopServiceReceiver()
+        onCreated {
+            val shareContextLease = acquireShareContext()
+            shareContext = shareContextLease.context
+            onDestroyed { shareContextLease.close() }
+            aliveSize++
+            onDestroyed { runMainPost(1000) { aliveSize-- } }
+            lifecycleScope.launch {
+                positionFlow.drop(1).debounce(300.milliseconds).collect { pos ->
+                    shareContext.positionMapFlow.update {
+                        it.toMutableMap().apply {
+                            set(positionKey, pos)
+                        }
+                    }
+                }
+            }
+            attachView()
+            onDestroyed { app.windowManager.removeView(view) }
+        }
+    }
+
+    private fun attachView() {
+        val marginX = minMargin
+        val marginY = minMargin
+        val layoutParams = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            windowAnimations = android.R.style.Animation_Dialog
+            gravity = Gravity.START or Gravity.TOP
+            x = positionFlow.value.first()
+            y = positionFlow.value.last()
+        }
+        var screenWidth = ScreenUtils.getScreenWidth()
+        var screenHeight = ScreenUtils.getScreenHeight()
+        var paramsXy = layoutParams.x to layoutParams.y
+        var fixMoveFlag = 0
+        val fixLimitXy = {
+            screenWidth = ScreenUtils.getScreenWidth()
+            screenHeight = ScreenUtils.getScreenHeight()
+            val x = layoutParams.x.coerceIn(marginX, screenWidth - view.width - marginX)
+            val y = layoutParams.y.coerceIn(
+                marginY,
+                screenHeight - view.height - marginY
+            )
+            if (x != layoutParams.x || y != layoutParams.y) {
+                positionFlow.value = listOf(x, y)
+                val startX = layoutParams.x
+                val startY = layoutParams.y
+                fixMoveFlag++
+                val tempFlag = fixMoveFlag
+                ValueAnimator.ofFloat(0f, 1f).apply {
+                    duration = 300
+                    addUpdateListener { animator ->
+                        if (tempFlag == fixMoveFlag) {
+                            val fraction = animator.animatedValue as Float
+                            layoutParams.x = (startX + (x - startX) * fraction).toInt()
+                            layoutParams.y = (startY + (y - startY) * fraction).toInt()
+                            app.windowManager.updateViewLayout(view, layoutParams)
+                        } else {
+                            pause()
+                        }
+                    }
+                    doOnEnd {
+                        if (tempFlag == fixMoveFlag) {
+                            fixMoveFlag = 0
+                        }
+                    }
+                }.start()
+            }
         }
         lifecycleScope.launch {
-            positionFlow.drop(1).debounce(300.milliseconds).collect { pos ->
-                shareContext.positionMapFlow.update {
-                    it.toMutableMap().apply {
-                        set(positionKey, pos)
-                    }
-                }
-            }
+            view.viewTreeObserver.addOnGlobalLayoutListener { launch { resizeFlow.emit(Unit) } }
+            resizeFlow.debounce(100.milliseconds).collect { fixLimitXy() }
         }
-        onCreated {
-            val marginX = minMargin
-            val marginY = minMargin
-            val layoutParams = WindowManager.LayoutParams(
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-                        WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-                PixelFormat.TRANSLUCENT
-            ).apply {
-                windowAnimations = android.R.style.Animation_Dialog
-                gravity = Gravity.START or Gravity.TOP
-                x = positionFlow.value.first()
-                y = positionFlow.value.last()
-            }
-            var screenWidth = ScreenUtils.getScreenWidth()
-            var screenHeight = ScreenUtils.getScreenHeight()
-            var paramsXy = layoutParams.x to layoutParams.y
-            var fixMoveFlag = 0
-            val fixLimitXy = {
-                screenWidth = ScreenUtils.getScreenWidth()
-                screenHeight = ScreenUtils.getScreenHeight()
-                val x = layoutParams.x.coerceIn(marginX, screenWidth - view.width - marginX)
-                val y = layoutParams.y.coerceIn(
-                    marginY,
-                    screenHeight - view.height - marginY
-                )
-                if (x != layoutParams.x || y != layoutParams.y) {
-                    positionFlow.value = listOf(x, y)
-                    val startX = layoutParams.x
-                    val startY = layoutParams.y
-                    fixMoveFlag++
-                    val tempFlag = fixMoveFlag
-                    ValueAnimator.ofFloat(0f, 1f).apply {
-                        duration = 300
-                        addUpdateListener { animator ->
-                            if (tempFlag == fixMoveFlag) {
-                                val fraction = animator.animatedValue as Float
-                                layoutParams.x = (startX + (x - startX) * fraction).toInt()
-                                layoutParams.y = (startY + (y - startY) * fraction).toInt()
-                                app.windowManager.updateViewLayout(view, layoutParams)
-                            } else {
-                                pause()
-                            }
-                        }
-                        doOnEnd {
-                            if (tempFlag == fixMoveFlag) {
-                                fixMoveFlag = 0
-                            }
-                        }
-                    }.start()
-                }
-            }
-            lifecycleScope.launch {
-                view.viewTreeObserver.addOnGlobalLayoutListener { launch { resizeFlow.emit(Unit) } }
-                resizeFlow.debounce(100.milliseconds).collect { fixLimitXy() }
-            }
-            var downXy: Pair<Float, Float>? = null
-            var longClickJob: kotlinx.coroutines.Job? = null
-            var viewClickEnabled = false
-            var isDragging = false
-            val touchSlop = ViewConfiguration.get(this).scaledTouchSlop
-            @SuppressLint("ClickableViewAccessibility")
-            view.setOnTouchListener { _, event ->
-                if (fixMoveFlag > 0) return@setOnTouchListener true
-                when (event.action) {
-                    MotionEvent.ACTION_DOWN -> {
-                        downXy = event.rawX to event.rawY
-                        screenWidth = ScreenUtils.getScreenWidth()
-                        screenHeight = ScreenUtils.getScreenHeight()
-                        paramsXy = layoutParams.x to layoutParams.y
-                        viewClickEnabled = isViewClickEnabled()
-                        isDragging = false
+        var downXy: Pair<Float, Float>? = null
+        var longClickJob: kotlinx.coroutines.Job? = null
+        var viewClickEnabled = false
+        var isDragging = false
+        val touchSlop = ViewConfiguration.get(this).scaledTouchSlop
+        @SuppressLint("ClickableViewAccessibility")
+        view.setOnTouchListener { _, event ->
+            if (fixMoveFlag > 0) return@setOnTouchListener true
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    downXy = event.rawX to event.rawY
+                    screenWidth = ScreenUtils.getScreenWidth()
+                    screenHeight = ScreenUtils.getScreenHeight()
+                    paramsXy = layoutParams.x to layoutParams.y
+                    viewClickEnabled = isViewClickEnabled()
+                    isDragging = false
+                    longClickJob = null
+                    longClickJob = lifecycleScope.launch {
+                        delay(500.milliseconds)
                         longClickJob = null
-                        longClickJob = scope.launch {
-                            delay(500.milliseconds)
+                        if (downXy != null) {
+                            onLongClickView()
+                        }
+                    }
+                    true
+                }
+
+                MotionEvent.ACTION_MOVE -> {
+                    downXy?.let { downEvent ->
+                        val dx = (event.rawX - downEvent.first).toInt()
+                        val dy = (event.rawY - downEvent.second).toInt()
+                        if (abs(dx) > touchSlop || abs(dy) > touchSlop) {
+                            isDragging = true
+                        }
+                        val x = dx + paramsXy.first
+                        val y = dy + paramsXy.second
+                        layoutParams.x = x.coerceIn(marginX, screenWidth - view.width - marginX)
+                        layoutParams.y = y.coerceIn(
+                            marginY,
+                            screenHeight - view.height - marginY
+                        )
+                        positionFlow.value = listOf(layoutParams.x, layoutParams.y)
+                        app.windowManager.updateViewLayout(view, layoutParams)
+                        if (isDragging) {
+                            longClickJob?.cancel()
                             longClickJob = null
-                            if (downXy != null) {
-                                onLongClickView()
-                            }
                         }
-                        true
                     }
-
-                    MotionEvent.ACTION_MOVE -> {
-                        downXy?.let { downEvent ->
-                            val dx = (event.rawX - downEvent.first).toInt()
-                            val dy = (event.rawY - downEvent.second).toInt()
-                            if (abs(dx) > touchSlop || abs(dy) > touchSlop) {
-                                isDragging = true
-                            }
-                            val x = dx + paramsXy.first
-                            val y = dy + paramsXy.second
-                            layoutParams.x = x.coerceIn(marginX, screenWidth - view.width - marginX)
-                            layoutParams.y = y.coerceIn(
-                                marginY,
-                                screenHeight - view.height - marginY
-                            )
-                            positionFlow.value = listOf(layoutParams.x, layoutParams.y)
-                            app.windowManager.updateViewLayout(view, layoutParams)
-                            if (isDragging) {
-                                longClickJob?.cancel()
-                                longClickJob = null
-                            }
-                        }
-                        true
-                    }
-
-                    MotionEvent.ACTION_UP -> {
-                        val gapTime = event.eventTime - event.downTime
-                        if (viewClickEnabled && !isDragging && gapTime <= ViewConfiguration.getTapTimeout()) {
-                            onClickView()
-                        }
-                        downXy = null
-                        longClickJob?.cancel()
-                        longClickJob = null
-                        true
-                    }
-
-                    MotionEvent.ACTION_CANCEL -> {
-                        downXy = null
-                        longClickJob?.cancel()
-                        longClickJob = null
-                        true
-                    }
-
-                    else -> false
+                    true
                 }
+
+                MotionEvent.ACTION_UP -> {
+                    val gapTime = event.eventTime - event.downTime
+                    if (viewClickEnabled && !isDragging && gapTime <= ViewConfiguration.getTapTimeout()) {
+                        onClickView()
+                    }
+                    downXy = null
+                    longClickJob?.cancel()
+                    longClickJob = null
+                    true
+                }
+
+                MotionEvent.ACTION_CANCEL -> {
+                    downXy = null
+                    longClickJob?.cancel()
+                    longClickJob = null
+                    true
+                }
+
+                else -> false
             }
-            app.windowManager.addView(view, layoutParams)
         }
-        onDestroyed { app.windowManager.removeView(view) }
+        app.windowManager.addView(view, layoutParams)
     }
+
 }

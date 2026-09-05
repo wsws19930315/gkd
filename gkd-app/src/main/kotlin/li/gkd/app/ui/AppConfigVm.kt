@@ -12,40 +12,43 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.runningFold
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
-import li.gkd.db.ActionLog
-import li.gkd.db.CategoryConfig
+import li.gkd.app.data.ruleconfig.RuleGroupConfigService
 import li.gkd.app.data.RawSubscription
-import li.gkd.db.SubsConfig
-import li.gkd.db.Db
+import li.gkd.app.data.subscription.UsedSubsEntry
 import li.gkd.app.store.storeFlow
-import li.gkd.app.ui.component.ShowGroupState
-import li.gkd.app.ui.component.batchUpdateGroupEnable
-import li.gkd.app.ui.component.getActualGroupChecked
-import li.gkd.app.ui.component.updateRuleGroupEnable
+import li.gkd.app.store.settingsRepository
+import li.gkd.app.domain.rule.RuleGroupTarget
+import li.gkd.app.domain.rule.RuleGroupPolicy
+import li.gkd.app.a11y.launcherAppId
 import li.gkd.app.ui.share.BaseViewModel
-import li.gkd.app.ui.share.Loadable
+import li.gkd.app.core.state.Loadable
 import li.gkd.app.util.RuleSortOption
-import li.gkd.app.util.SubscriptionStore
-import li.gkd.app.util.UsedSubsEntry
-import li.gkd.app.util.AppInfoState
-import li.gkd.app.util.SubsState
+import li.gkd.app.subscriptionRepository
+import li.gkd.app.appInfoRepository
+import li.gkd.app.subscriptionState
 import li.gkd.app.util.collator
 import li.gkd.app.util.findOption
 import li.gkd.app.util.toJson5String
+import li.gkd.db.ActionLog
+import li.gkd.db.SubsAppGroupConfig
+import li.gkd.db.SubsCategoryConfig
+import li.gkd.db.Db
+import li.gkd.db.SubsGlobalGroupConfig
+import li.gkd.db.SubsGroupConfig
+import li.gkd.db.RuleGroupType
 
 data class AppConfigUiState(
-    val globalSubsConfigs: List<SubsConfig>,
-    val appSubsConfigs: List<SubsConfig>,
-    val categoryConfigs: List<CategoryConfig>,
+    val globalSubsConfigs: List<SubsGlobalGroupConfig>,
+    val appSubsConfigs: List<SubsAppGroupConfig>,
+    val categoryConfigs: List<SubsCategoryConfig>,
     val subsPairs: List<Pair<UsedSubsEntry, List<RawSubscription.RawGroupProps>>>,
 )
 
 private data class AppConfigDatabaseState(
-    val globalSubsConfigs: List<SubsConfig>,
-    val appSubsConfigs: List<SubsConfig>,
-    val categoryConfigs: List<CategoryConfig>,
+    val globalSubsConfigs: List<SubsGlobalGroupConfig>,
+    val appSubsConfigs: List<SubsAppGroupConfig>,
+    val categoryConfigs: List<SubsCategoryConfig>,
     val subsPairs: List<Pair<UsedSubsEntry, List<RawSubscription.RawGroupProps>>>,
     val checkedGroupKeys: Set<Triple<Long, Int, Int>>,
 )
@@ -61,36 +64,38 @@ private data class AppConfigSortState(
     val latestLogs: List<ActionLog>,
 )
 
-class AppConfigVm(val route: AppConfigRoute) : BaseViewModel() {
+class AppConfigVm(
+    val route: AppConfigRoute,
+) : BaseViewModel() {
     fun setRuleSortType(option: RuleSortOption) {
-        storeFlow.update { it.copy(appRuleSort = option.value) }
+        settingsRepository.updateSettings { it.copy(appRuleSort = option.value) }
     }
 
     fun toggleShowDisabledRule() {
-        storeFlow.update { it.copy(showDisabledRule = !it.showDisabledRule) }
+        settingsRepository.updateSettings { it.copy(showDisabledRule = !it.showDisabledRule) }
     }
 
-    private val databaseStateFlow = SubscriptionStore.snapshotFlow.flatMapLatest { snapshotState ->
+    private val databaseStateFlow = subscriptionRepository.snapshotFlow.flatMapLatest { snapshotState ->
         when (snapshotState) {
             Loadable.Loading -> flowOf(Loadable.Loading)
             is Loadable.Failure -> flowOf(snapshotState)
             is Loadable.Ready -> combine(
                 Db.subsItemDao.query(),
-                Db.appConfigDao.queryAppUsedList(route.appId),
+                Db.subsAppConfigDao.queryAppUsedList(route.appId),
             ) { items, appConfigs ->
                 val usedSubsIds = items.filter { it.enable }.map { it.id }.sorted()
                 val appUsedSubsIds = usedSubsIds.filter { id ->
                     appConfigs.find { it.subsId == id }?.enable != false
                 }
-                val entries = SubsState.buildUsedSubsEntries(
-                    SubsState.buildSubsEntries(items, snapshotState.value.subscriptions)
+                val entries = subscriptionState.buildUsedSubsEntries(
+                    subscriptionState.buildSubsEntries(items, snapshotState.value.subscriptions)
                 )
                 appUsedSubsIds to entries
             }.distinctUntilChanged().flatMapLatest { (usedSubsIds, entries) ->
                 combine(
-                    Db.subsConfigDao.queryUsedGlobalConfig(),
-                    Db.subsConfigDao.queryAppConfig(usedSubsIds, route.appId),
-                    Db.categoryConfigDao.queryBySubsIds(usedSubsIds),
+                    Db.subsGlobalGroupConfigDao.queryUsedList(),
+                    Db.subsAppGroupConfigDao.queryAppConfig(usedSubsIds, route.appId),
+                    Db.subsCategoryConfigDao.queryBySubsIds(usedSubsIds),
                 ) { globalConfigs, appConfigs, categoryConfigs ->
                     val subsPairs = entries.map { entry ->
                         val globalGroups = entry.subscription.globalGroups.filter { group ->
@@ -127,12 +132,14 @@ class AppConfigVm(val route: AppConfigRoute) : BaseViewModel() {
                                             it.categoryKey == targetCategory.key
                                     }
                                 }
-                                val checked = getActualGroupChecked(
-                                    subs = entry.subscription,
+                                val checked = RuleGroupPolicy.getActualGroupChecked(
+                                    subscription = entry.subscription,
                                     group = group,
                                     appId = route.appId,
                                     subsConfig = subsConfig,
                                     categoryConfig = categoryConfig,
+                                    launcherAppId = launcherAppId,
+                                    systemAppIds = appInfoRepository.systemAppsFlow.value,
                                 ) && (
                                     group !is RawSubscription.RawGlobalGroup ||
                                         subsConfig?.enable != false
@@ -249,13 +256,18 @@ class AppConfigVm(val route: AppConfigRoute) : BaseViewModel() {
     }.stateIn(scope, SharingStarted.Eagerly, Loadable.Loading)
 
     suspend fun updateSelectedEnabled(
-        selectedGroups: Set<ShowGroupState>,
+        selectedGroups: Set<RuleGroupTarget>,
         enabled: Boolean?,
     ): Int {
-        return batchUpdateGroupEnable(selectedGroups, enabled).size
+        return RuleGroupConfigService.batchUpdateGroupEnabled(
+            selectedGroups,
+            enabled,
+            launcherAppId,
+            appInfoRepository.systemAppsFlow.value,
+        ).size
     }
 
-    suspend fun buildSelectedGroupsText(selectedGroups: Set<ShowGroupState>): String =
+    suspend fun buildSelectedGroupsText(selectedGroups: Set<RuleGroupTarget>): String =
         withContext(Dispatchers.Default) {
             val selectedKeys = selectedGroups.mapTo(mutableSetOf()) {
                 Triple(it.subsId, it.groupType, it.groupKey)
@@ -263,13 +275,13 @@ class AppConfigVm(val route: AppConfigRoute) : BaseViewModel() {
             val subsPairs = uiState.value.value?.subsPairs.orEmpty()
             val groups = subsPairs.flatMap { (entry, groups) ->
                 groups.filterIsInstance<RawSubscription.RawAppGroup>().filter { group ->
-                    Triple(entry.subsItem.id, SubsConfig.AppGroupType, group.key) in selectedKeys
+                    Triple(entry.subsItem.id, RuleGroupType.App, group.key) in selectedKeys
                 }
             }
             toJson5String(
                 RawSubscription.RawApp(
                     id = route.appId,
-                    name = AppInfoState.appInfoMapFlow.value[route.appId]?.name,
+                    name = appInfoRepository.appInfoMapFlow.value[route.appId]?.name,
                     groups = groups,
                 )
             )
@@ -278,10 +290,16 @@ class AppConfigVm(val route: AppConfigRoute) : BaseViewModel() {
     suspend fun setGroupEnabled(
         subscription: RawSubscription,
         group: RawSubscription.RawGroupProps,
-        subsConfig: SubsConfig?,
+        subsConfig: SubsGroupConfig?,
         enabled: Boolean,
     ) {
-        updateRuleGroupEnable(subscription, route.appId, group, subsConfig, enabled)
+        RuleGroupConfigService.updateGroupEnabled(
+            subscription,
+            route.appId,
+            group,
+            subsConfig,
+            enabled,
+        )
     }
 
     val focusGroupFlow: StateFlow<Triple<Long, String?, Int>?>?
@@ -289,7 +307,7 @@ class AppConfigVm(val route: AppConfigRoute) : BaseViewModel() {
             MutableStateFlow<Triple<Long, String?, Int>?>(
                 Triple(
                     it.subsId,
-                    if (it.groupType == SubsConfig.AppGroupType) it.appId else null,
+                    if (it.groupType == RuleGroupType.App) it.appId else null,
                     it.groupKey,
                 )
             )

@@ -13,7 +13,7 @@ import li.gkd.app.data.CrashData
 import li.gkd.app.data.deleteCrashDataList
 import li.gkd.app.data.loadCrashDataList
 import li.gkd.app.ui.share.BaseViewModel
-import li.gkd.app.ui.share.Loadable
+import li.gkd.app.core.state.Loadable
 
 class CrashReportVm(
     initialCrashDataList: List<CrashData>,

@@ -23,6 +23,7 @@ import li.gkd.app.data.info2nodeList
 import li.gkd.app.notif.NotificationCatalog
 import li.gkd.app.priv.privilegeContextFlow
 import li.gkd.app.service.ScreenshotService
+import li.gkd.app.snapshotRepository
 import li.gkd.app.store.storeFlow
 import li.gkd.app.util.AndroidTarget
 import li.gkd.app.util.AutomatorModeOption
@@ -32,7 +33,7 @@ import li.gkd.app.util.ScreenUtils
 import li.gkd.app.util.SystemDownloads
 import li.gkd.app.util.getShowActivityId
 import li.gkd.app.util.px
-import li.gkd.app.util.toast
+import li.gkd.app.util.ToastUtils.toast
 import kotlin.math.min
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -265,7 +266,7 @@ object SnapshotCapture {
             }
 
             try {
-                SnapshotStore.save(snapshot, screenResult.bitmap)
+                snapshotRepository.save(snapshot, screenResult.bitmap)
             } finally {
                 screenResult.bitmap.recycle()
             }
@@ -273,7 +274,7 @@ object SnapshotCapture {
                 storeFlow.value.autoSaveSnapshotToDownloads && SystemDownloads.canSave()
             ) {
                 try {
-                    val archive = SnapshotStore.createArchive(
+                    val archive = snapshotRepository.createArchive(
                         snapshot.id,
                         snapshot.appId,
                         snapshot.activityId,
@@ -281,7 +282,7 @@ object SnapshotCapture {
                     try {
                         SystemDownloads.save(archive)
                     } finally {
-                        SnapshotStore.deleteArchive(archive)
+                        snapshotRepository.deleteArchive(archive)
                     }
                 } catch (e: CancellationException) {
                     throw e

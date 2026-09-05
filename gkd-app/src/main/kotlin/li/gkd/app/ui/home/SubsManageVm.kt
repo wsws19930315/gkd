@@ -10,18 +10,19 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 import li.gkd.app.data.RawSubscription
 import li.gkd.db.SubsItem
-import li.gkd.db.Db
 import li.gkd.app.store.storeFlow
+import li.gkd.app.store.settingsRepository
 import li.gkd.app.ui.share.BaseViewModel
-import li.gkd.app.ui.share.Loadable
-import li.gkd.app.util.SubscriptionResult
-import li.gkd.app.util.SubscriptionSnapshot
-import li.gkd.app.util.SubscriptionStore
-import li.gkd.app.util.launchTry
-import li.gkd.app.util.toast
+import li.gkd.app.core.state.Loadable
+import li.gkd.app.data.subscription.SubscriptionResult
+import li.gkd.app.data.subscription.SubscriptionSnapshot
+import li.gkd.app.subscriptionRepository
+import li.gkd.app.ui.share.launchUi
+import li.gkd.app.ui.share.message
+import li.gkd.app.util.ToastUtils.toast
+import li.gkd.db.Db
 
 data class SubsManageUiState(
     val subItems: List<SubsItem>,
@@ -50,13 +51,13 @@ class SubsManageVm : BaseViewModel() {
         field = MutableStateFlow(null)
 
     val uiState: StateFlow<Loadable<SubsManageUiState>> =
-        SubscriptionStore.snapshotFlow.flatMapLatest { snapshotState ->
+        subscriptionRepository.snapshotFlow.flatMapLatest { snapshotState ->
             when (snapshotState) {
                 Loadable.Loading -> flowOf(Loadable.Loading)
                 is Loadable.Failure -> flowOf(snapshotState)
                 is Loadable.Ready -> combine(
                     Db.subsItemDao.query(),
-                    SubscriptionStore.updating,
+                    subscriptionRepository.updating,
                 ) { subItems, refreshing ->
                     buildSubsManageUiState(
                         subItems = subItems,
@@ -69,11 +70,11 @@ class SubsManageVm : BaseViewModel() {
         }.stateIn(scope, SharingStarted.Eagerly, Loadable.Loading)
 
     fun setUpdateInterval(value: Long) {
-        storeFlow.update { it.copy(updateSubsInterval = value) }
+        settingsRepository.updateSettings { it.copy(updateSubsInterval = value) }
     }
 
     fun setPowerWarningEnabled(enabled: Boolean) {
-        storeFlow.update { it.copy(subsPowerWarn = enabled) }
+        settingsRepository.updateSettings { it.copy(subsPowerWarn = enabled) }
     }
 
     fun setSettingsDialogVisible(visible: Boolean) {
@@ -81,20 +82,20 @@ class SubsManageVm : BaseViewModel() {
     }
 
     fun toggleMatching() {
-        storeFlow.update { it.copy(enableMatch = !it.enableMatch) }
+        settingsRepository.updateSettings { it.copy(enableMatch = !it.enableMatch) }
     }
 
     fun refresh() {
-        scope.launchTry(Dispatchers.IO) {
-            SubscriptionStore.refresh().message?.let { toast(it) }
+        scope.launchUi(Dispatchers.IO) {
+            subscriptionRepository.refresh().message?.let { toast(it) }
         }
     }
 
     suspend fun deleteSubscriptions(ids: Set<Long>): SubscriptionResult =
-        SubscriptionStore.delete(*ids.toLongArray())
+        subscriptionRepository.delete(*ids.toLongArray())
 
     fun updateOrder(items: List<SubsItem>) {
-        scope.launchTry(Dispatchers.IO) {
+        scope.launchUi(Dispatchers.IO) {
             Db.subsItemDao.batchUpdateOrder(items)
         }
     }
@@ -130,7 +131,7 @@ class SubsManageVm : BaseViewModel() {
     }
 
     private fun setSubscriptionEnabled(item: SubsItem, enabled: Boolean) {
-        scope.launchTry(Dispatchers.IO) {
+        scope.launchUi(Dispatchers.IO) {
             Db.subsItemDao.updateEnable(item.id, enabled)
         }
     }
@@ -138,5 +139,5 @@ class SubsManageVm : BaseViewModel() {
     suspend fun addOrModifySubscription(
         url: String,
         oldItem: SubsItem? = null,
-    ): SubscriptionResult = SubscriptionStore.addOrModifyRemote(url, oldItem)
+    ): SubscriptionResult = subscriptionRepository.addOrModifyRemote(url, oldItem)
 }

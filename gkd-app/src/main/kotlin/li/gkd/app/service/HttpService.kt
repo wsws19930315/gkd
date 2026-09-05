@@ -1,8 +1,7 @@
 package li.gkd.app.service
 
-import android.app.Service
-import android.content.Intent
 import android.util.Log
+import androidx.lifecycle.lifecycleScope
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
@@ -28,13 +27,14 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
-import li.gkd.app.MainViewModel
 import li.gkd.app.a11y.A11yRuleEngine
 import li.gkd.app.appScope
 import li.gkd.app.data.AppInfo
@@ -44,82 +44,74 @@ import li.gkd.app.data.RawSubscription
 import li.gkd.app.data.RpcError
 import li.gkd.db.SubsItem
 import li.gkd.app.data.selfAppInfo
-import li.gkd.db.Db
 import li.gkd.app.notif.NotificationCatalog
-import li.gkd.app.notif.StopServiceReceiver
-import li.gkd.app.permission.PermissionStates
 import li.gkd.app.store.storeFlow
-import li.gkd.app.util.DefaultSimpleLifeImpl
 import li.gkd.db.LOCAL_HTTP_SUBS_ID
 import li.gkd.app.util.LogUtils
-import li.gkd.app.util.OnSimpleLife
 import li.gkd.app.util.SERVER_SCRIPT_URL
 import li.gkd.app.snapshot.SnapshotCapture
-import li.gkd.app.snapshot.SnapshotStore
-import li.gkd.app.util.SubscriptionStore
+import li.gkd.app.snapshotRepository
+import li.gkd.app.subscriptionRepository
 import li.gkd.app.util.NetworkUtils
 import li.gkd.app.util.keepNullJson
-import li.gkd.app.util.launchTry
+import li.gkd.app.util.launchLogged
 import li.gkd.app.util.mapState
 import li.gkd.app.util.IntentUtils
-import li.gkd.app.util.toast
+import li.gkd.app.util.ToastUtils.toast
 
 
-class HttpService : Service(), OnSimpleLife by DefaultSimpleLifeImpl() {
-    override fun onBind(intent: Intent?) = null
-    override fun onCreate() = onCreated()
-    override fun onDestroy() = onDestroyed()
-
-    val httpServerPortFlow = storeFlow.mapState(scope) { s -> s.httpServerPort }
-
+class HttpService : LifecycleHookService() {
+    val httpServerPortFlow by lazy {
+        storeFlow.mapState(lifecycleScope) { s -> s.httpServerPort }
+    }
     init {
         useLogLifecycle()
-        useAliveFlow(isRunning)
-        useAliveToast("HTTP服务")
-        StopServiceReceiver.autoRegister()
+        useServicePresence(
+            stateFlow = isRunning,
+            name = "HTTP服务",
+        )
+        useStopServiceReceiver()
+        onDestroyed {
+            if (storeFlow.value.autoClearMemorySubs) {
+                appScope.launchLogged(Dispatchers.IO) {
+                    subscriptionRepository.delete(LOCAL_HTTP_SUBS_ID)
+                }
+            }
+        }
         onCreated {
-            scope.launchTry(Dispatchers.IO) {
+            lifecycleScope.launchLogged(Dispatchers.IO) {
                 httpServerPortFlow.collect {
                     localNetworkIpsFlow.value = NetworkUtils.getIpAddressInLocalNetwork()
                 }
             }
-        }
-        onDestroyed {
-            if (storeFlow.value.autoClearMemorySubs) {
-                appScope.launchTry(Dispatchers.IO) {
-                    SubscriptionStore.delete(LOCAL_HTTP_SUBS_ID)
-                }
-            }
-            httpServerFlow.value = null
-        }
-        onCreated {
             NotificationCatalog.http(httpServerPortFlow.value).startForeground()
-            scope.launchTry(Dispatchers.IO) {
-                httpServerPortFlow.collect { port ->
-                    val isReboot = httpServerFlow.value != null
-                    httpServerFlow.apply {
-                        value?.stop()
-                        value = null
-                    }
+            var startedOnce = false
+            lifecycleScope.launchLogged(Dispatchers.IO) {
+                httpServerPortFlow.collectLatest { port ->
                     if (!NetworkUtils.isPortAvailable(port)) {
                         toast("端口 $port 被占用，请更换后重试")
                         stopSelf()
-                        return@collect
+                        return@collectLatest
                     }
-                    httpServerFlow.value = try {
-                        scope.createServer(port).apply { start() }
+                    val server = try {
+                        createServer(port).apply { start() }
                     } catch (e: Exception) {
                         toast("HTTP服务启动失败:${e.stackTraceToString()}")
                         LogUtils.d("HTTP服务启动失败", e)
-                        null
-                    }
-                    if (httpServerFlow.value == null) {
                         stopSelf()
-                    } else {
-                        NotificationCatalog.http(port).startForeground()
-                        if (isReboot) {
-                            toast("HTTP服务重启成功")
-                        }
+                        return@collectLatest
+                    }
+                    httpServerFlow.value = server
+                    NotificationCatalog.http(port).startForeground()
+                    if (startedOnce) {
+                        toast("HTTP服务重启成功")
+                    }
+                    startedOnce = true
+                    try {
+                        awaitCancellation()
+                    } finally {
+                        httpServerFlow.compareAndSet(server, null)
+                        server.stop()
                     }
                 }
             }
@@ -127,25 +119,15 @@ class HttpService : Service(), OnSimpleLife by DefaultSimpleLifeImpl() {
     }
 
     companion object {
-        val httpServerFlow = MutableStateFlow<ServerType?>(null)
-        val isRunning = MutableStateFlow(false)
-        val localNetworkIpsFlow = MutableStateFlow(emptyList<String>())
+        val httpServerFlow: StateFlow<ServerType?>
+            field = MutableStateFlow(null)
+        val isRunning: StateFlow<Boolean>
+            field = MutableStateFlow(false)
+        val localNetworkIpsFlow: StateFlow<List<String>>
+            field = MutableStateFlow(emptyList())
         fun stop() = IntentUtils.stopServiceByClass(HttpService::class)
         fun start() = IntentUtils.startForegroundServiceByClass(HttpService::class)
 
-        suspend fun setEnabled(mainVm: MainViewModel, enabled: Boolean) {
-            if (!enabled) {
-                stop()
-                return
-            }
-            if (!mainVm.permissionRequests.ensurePermissions(
-                    PermissionStates.foregroundServiceSpecialUse,
-                    PermissionStates.notification,
-                    PermissionStates.localNetwork,
-                )
-            ) return
-            start()
-        }
     }
 }
 
@@ -171,10 +153,10 @@ data class ServerInfo(
 fun clearHttpSubs() {
     // 如果 app 被直接在任务列表划掉, HTTP订阅会没有清除, 所以在后续的第一次启动时清除
     if (HttpService.isRunning.value) return
-    appScope.launchTry {
+    appScope.launchLogged {
         delay(1000)
         if (storeFlow.value.autoClearMemorySubs) {
-            SubscriptionStore.delete(LOCAL_HTTP_SUBS_ID)
+            subscriptionRepository.delete(LOCAL_HTTP_SUBS_ID)
         }
     }
 }
@@ -185,7 +167,7 @@ private val httpSubsItem = SubsItem(
     enableUpdate = false,
 )
 
-private fun CoroutineScope.createServer(port: Int) = embeddedServer(CIO, port) {
+private fun createServer(port: Int) = embeddedServer(CIO, port) {
     install(getKtorCorsPlugin())
     install(getKtorErrorPlugin())
     install(ContentNegotiation) { json(keepNullJson) }
@@ -195,7 +177,7 @@ private fun CoroutineScope.createServer(port: Int) = embeddedServer(CIO, port) {
             post("/getServerInfo") { call.respond(ServerInfo()) }
             post("/getSnapshot") {
                 val data = call.receive<ReqId>()
-                val fp = SnapshotStore.snapshotFile(data.id)
+                val fp = snapshotRepository.snapshotFile(data.id)
                 if (!fp.exists()) {
                     throw RpcError("对应快照不存在")
                 }
@@ -203,7 +185,7 @@ private fun CoroutineScope.createServer(port: Int) = embeddedServer(CIO, port) {
             }
             post("/getScreenshot") {
                 val data = call.receive<ReqId>()
-                val fp = SnapshotStore.screenshotFile(data.id)
+                val fp = snapshotRepository.screenshotFile(data.id)
                 if (!fp.exists()) {
                     throw RpcError("对应截图不存在")
                 }
@@ -213,9 +195,9 @@ private fun CoroutineScope.createServer(port: Int) = embeddedServer(CIO, port) {
                 call.respond(SnapshotCapture.capture())
             }
             post("/getSnapshots") {
-                val list = Db.snapshotDao.query().first().mapNotNull {
+                val list = snapshotRepository.snapshots().first().mapNotNull {
                     try {
-                        SnapshotStore.getMinSnapshot(it.id)
+                        snapshotRepository.getMinSnapshot(it.id)
                     } catch (_: Throwable) {
                         null
                     }
@@ -224,10 +206,10 @@ private fun CoroutineScope.createServer(port: Int) = embeddedServer(CIO, port) {
             }
             post("/deleteSnapshot") {
                 val data = call.receive<ReqId>()
-                val allSnapshots = Db.snapshotDao.query().first()
+                val allSnapshots = snapshotRepository.snapshots().first()
                 val snapshot = allSnapshots.find { it.id == data.id }
                 if (snapshot != null) {
-                    SnapshotStore.delete(snapshot)
+                    snapshotRepository.delete(snapshot)
                     call.respond(RpcOk("快照删除成功"))
                 } else {
                     throw RpcError("快照不存在或已被删除")
@@ -242,7 +224,7 @@ private fun CoroutineScope.createServer(port: Int) = embeddedServer(CIO, port) {
                             version = 0,
                             author = "@gkd-kit/inspect"
                         )
-                SubscriptionStore.saveWithItem(subscription, httpSubsItem)
+                subscriptionRepository.saveWithItem(subscription, httpSubsItem)
                 call.respond(RpcOk())
             }
             post("/execSelector") {

@@ -1,5 +1,7 @@
 package li.gkd.app.util
 
+import li.gkd.app.util.ToastUtils.toast
+
 import android.app.Service
 import android.content.Intent
 import android.net.Uri
@@ -7,8 +9,9 @@ import android.provider.Settings
 import androidx.core.net.toUri
 import li.gkd.app.META
 import li.gkd.app.app
-import li.gkd.app.isActivityVisible
 import li.gkd.app.permission.PermissionStates
+import li.gkd.app.platform.lifecycle.MainActivityVisibility
+import li.songe.codeorigin.CallSite
 import kotlin.reflect.KClass
 
 object IntentUtils {
@@ -59,16 +62,19 @@ object IntentUtils {
         app.stopService(intent)
     }
 
-    fun <T : Service> startForegroundServiceByClass(clazz: KClass<T>) {
-        if (!PermissionStates.notification.checkOrToast()) return
-        if (!PermissionStates.foregroundServiceSpecialUse.checkOrToast()) return
+    fun <T : Service> startForegroundServiceByClass(
+        clazz: KClass<T>,
+        @CallSite loc: String = "",
+    ) {
+        if (!PermissionStates.notification.checkOrToast(loc = loc)) return
+        if (!PermissionStates.foregroundServiceSpecialUse.checkOrToast(loc = loc)) return
         val intent = Intent(app, clazz.java)
         try {
             app.startForegroundService(intent)
         } catch (e: Throwable) {
-            LogUtils.d(e)
-            val prefix = if (isActivityVisible) "" else "${META.appName}: "
-            toast("${prefix}启动服务失败: ${e.message}", forced = true)
+            LogUtils.d(e, loc = loc)
+            val prefix = if (MainActivityVisibility.isVisible) "" else "${META.appName}: "
+            toast("${prefix}启动服务失败: ${e.message}", forced = true, loc = loc)
         }
     }
 }

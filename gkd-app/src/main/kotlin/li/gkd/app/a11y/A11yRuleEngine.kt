@@ -26,7 +26,7 @@ import li.gkd.app.data.GkdAction
 import li.gkd.app.data.ResolvedRule
 import li.gkd.app.data.RpcError
 import li.gkd.app.data.RuleStatus
-import li.gkd.app.isActivityVisible
+import li.gkd.app.platform.lifecycle.MainActivityVisibility
 import li.gkd.app.service.A11yService
 import li.gkd.app.service.EventService
 import li.gkd.app.service.topAppIdFlow
@@ -36,9 +36,9 @@ import li.gkd.app.store.actualBlockA11yAppList
 import li.gkd.app.store.storeFlow
 import li.gkd.app.util.AndroidTarget
 import li.gkd.app.util.AutomatorModeOption
-import li.gkd.app.util.launchTry
+import li.gkd.app.util.launchLogged
 import li.gkd.app.util.runMainPost
-import li.gkd.app.util.showActionToast
+import li.gkd.app.util.ToastUtils.showActionToast
 import li.gkd.app.util.systemUiAppId
 import li.gkd.selector.MatchOptions
 import li.gkd.selector.Selector
@@ -131,7 +131,10 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
             if (event.recordCount == 0 && event.action == 0 && !event.isFullScreen) return
         }
         // 直接丢弃自身事件，自行更新 topActivity
-        if ((event.eventType == CONTENT_CHANGED || !isActivityVisible) && event.packageName == META.appId) return
+        if (
+            (event.eventType == CONTENT_CHANGED || !MainActivityVisibility.isVisible) &&
+            event.packageName == META.appId
+        ) return
 
         val a11yEvent = event.toA11yEvent() ?: return
         if (a11yEvent.type == CONTENT_CHANGED) {
@@ -255,7 +258,7 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
         if (querying) return
         // 无障碍从零启动时获取 safeActiveWindow 非常耗时
         if (byEvent == null && service.justStarted && !hasOthersService) return checkFutureStartJob()
-        scope.launchTry(queryDispatcher) {
+        scope.launchLogged(queryDispatcher) {
             querying = true
             val st = if (META.debuggable) System.currentTimeMillis() else 0L
             try {

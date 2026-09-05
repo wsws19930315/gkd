@@ -11,7 +11,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import li.gkd.app.a11y.useA11yServiceEnabledFlow
@@ -19,7 +18,6 @@ import li.gkd.app.a11y.useEnabledA11yServicesFlow
 import li.gkd.app.data.CrashData
 import li.gkd.app.data.RawSubscription
 import li.gkd.app.data.trimCrashDataFiles
-import li.gkd.db.Db
 import li.gkd.app.entry.EntryActivity
 import li.gkd.app.entry.OpenFileActivity
 import li.gkd.app.priv.AutomationService
@@ -30,39 +28,39 @@ import li.gkd.app.permission.PermissionStates
 import li.gkd.app.service.A11yService
 import li.gkd.app.store.createTextFlow
 import li.gkd.app.store.storeFlow
-import li.gkd.app.ui.AdvancedPageRoute
+import li.gkd.app.store.settingsRepository
+import li.gkd.app.feature.settings.AdvancedPageRoute
 import li.gkd.app.ui.CrashReportRoute
 import li.gkd.app.ui.PrivilegeServiceRoute
-import li.gkd.app.ui.SnapshotPageRoute
+import li.gkd.app.feature.snapshot.SnapshotPageRoute
 import li.gkd.app.ui.WebViewRoute
 import li.gkd.app.ui.component.DialogRequests
 import li.gkd.app.ui.component.GithubUploadState
-import li.gkd.app.ui.component.RuleGroupState
+import li.gkd.app.feature.subscription.RuleGroupState
 import li.gkd.app.ui.component.ShareLogState
-import li.gkd.app.ui.component.ShowGroupState
-import li.gkd.app.ui.component.SubsLinkDialogState
-import li.gkd.app.ui.component.SubsSheetState
+import li.gkd.app.domain.rule.RuleGroupTarget
+import li.gkd.app.feature.subscription.SubsLinkDialogState
+import li.gkd.app.feature.subscription.SubsSheetState
 import li.gkd.app.ui.component.TextDialogState
 import li.gkd.app.ui.home.BottomNavItem
 import li.gkd.app.ui.home.HomeRoute
 import li.gkd.app.ui.share.BaseViewModel
 import li.gkd.app.ui.share.ActivityResultRequests
+import li.gkd.app.ui.share.launchUi
 import li.gkd.app.util.AutomatorModeOption
-import li.gkd.app.util.BackupUtils
-import li.gkd.app.util.DefaultSimpleLifeImpl
 import li.gkd.app.util.LogUtils
-import li.gkd.app.util.OnSimpleLife
 import li.gkd.app.util.ShortUrlSet
 import li.gkd.app.util.ThrottleTimer
 import li.gkd.app.util.UpdateStatus
-import li.gkd.app.util.AppInfoState
+import li.gkd.app.appInfoRepository
 import li.gkd.app.util.FolderUtils
 import li.gkd.app.util.findOption
 import li.gkd.app.util.json
-import li.gkd.app.util.launchTry
+import li.gkd.app.util.launchLogged
 import li.gkd.app.util.IntentUtils
 import li.gkd.app.util.runMainPost
-import li.gkd.app.util.toast
+import li.gkd.app.util.ToastUtils.toast
+import li.gkd.db.Db
 import li.songe.codeorigin.CallSite
 import java.nio.file.Files
 import kotlin.reflect.jvm.jvmName
@@ -73,7 +71,7 @@ data class PageScrollResetRequest(
     val navItem: BottomNavItem,
 )
 
-class MainViewModel : BaseViewModel(), OnSimpleLife by DefaultSimpleLifeImpl() {
+class MainViewModel : BaseViewModel() {
     companion object {
         private var tempTermsAccepted = false
     }
@@ -95,8 +93,6 @@ class MainViewModel : BaseViewModel(), OnSimpleLife by DefaultSimpleLifeImpl() {
             termsAcceptedFlow.value = true
         }
     }
-
-    override val scope get() = super.scope
 
     val activityResults = ActivityResultRequests()
     val permissionRequests = PermissionRequests {
@@ -158,7 +154,7 @@ class MainViewModel : BaseViewModel(), OnSimpleLife by DefaultSimpleLifeImpl() {
     val subsSheet = SubsSheetState()
 
     val appOrderListState = Db.actionLogDao.queryLatestUniqueAppIds().stateLoadable()
-    val appVisitOrderMapState = Db.appVisitLogDao.query().map {
+    val appVisitOrderMapState = Db.appLastVisitDao.query().map {
         it.mapIndexed { i, appId -> appId to i }.toMap()
     }.debounce(500).stateLoadable()
 
@@ -174,12 +170,19 @@ class MainViewModel : BaseViewModel(), OnSimpleLife by DefaultSimpleLifeImpl() {
             group.cacheStr
             runMainPost {
                 ruleGroupState.showGroup(
-                    ShowGroupState(
-                        subsId = subscriptionId,
-                        appId = if (group is RawSubscription.RawAppGroup) appId else null,
-                        groupKey = group.key,
-                        pageAppId = pageAppId,
-                    ),
+                    when (group) {
+                        is RawSubscription.RawAppGroup -> RuleGroupTarget.App(
+                            subsId = subscriptionId,
+                            appId = appId ?: error("require appId"),
+                            groupKey = group.key,
+                        )
+
+                        is RawSubscription.RawGlobalGroup -> RuleGroupTarget.Global(
+                            subsId = subscriptionId,
+                            groupKey = group.key,
+                            pageAppId = pageAppId,
+                        )
+                    },
                 )
             }
         }
@@ -221,11 +224,13 @@ class MainViewModel : BaseViewModel(), OnSimpleLife by DefaultSimpleLifeImpl() {
         val notFoundToast = { toast("未知URI\n${uri}") }
         when (uri.host) {
             "page" -> when (uri.path) {
-                "" -> {
+                "" -> runMainPost {
                     val tab = uri.getQueryParameter("tab")?.toIntOrNull()
                     if (tab != null && BottomNavItem.allSubObjects.any { it.key == tab }) {
                         tabFlow.value = tab
                     }
+                    // MainActivity 被复用时，也需要返回首页。
+                    backStack.subList(1, backStack.size).clear()
                 }
 
                 "/1" -> navigatePage(AdvancedPageRoute)
@@ -243,14 +248,23 @@ class MainViewModel : BaseViewModel(), OnSimpleLife by DefaultSimpleLifeImpl() {
         }
     }
 
-    fun handleIntent(intent: Intent) = scope.launchTry {
+    fun handleIntent(intent: Intent) = scope.launchUi {
         LogUtils.d(intent)
         val uri = intent.data?.normalizeScheme()
         val source = intent.getStringExtra(EntryActivity.activityNavSourceName)
         if (uri?.scheme == "gkd") {
             handleGkdUri(uri)
         } else if (source == OpenFileActivity::class.jvmName && uri != null) {
-            withContext(Dispatchers.IO) { BackupUtils.importBackUpData(uri) }
+            if (!dialogRequests.confirm(
+                    title = "导入备份",
+                    text = "备份会写入应用设置、订阅和规则配置，是否继续？",
+                )
+            ) {
+                return@launchUi
+            }
+            toast("导入备份中...")
+            withContext(Dispatchers.IO) { backupManager.importData(uri) }
+            toast("导入成功")
         }
     }
 
@@ -271,8 +285,8 @@ class MainViewModel : BaseViewModel(), OnSimpleLife by DefaultSimpleLifeImpl() {
             }
         }
 
-    private val a11yServicesFlow = useEnabledA11yServicesFlow()
-    val a11yServiceEnabledFlow = useA11yServiceEnabledFlow(a11yServicesFlow)
+    private val a11yServicesFlow = useEnabledA11yServicesFlow(scope)
+    val a11yServiceEnabledFlow = useA11yServiceEnabledFlow(scope, a11yServicesFlow)
 
     val automatorModeFlow = storeFlow.mapNew {
         AutomatorModeOption.objects.findOption(it.automatorMode)
@@ -281,7 +295,7 @@ class MainViewModel : BaseViewModel(), OnSimpleLife by DefaultSimpleLifeImpl() {
     private var updateAutomatorModeJob: Job? = null
 
     private fun applyAutomatorMode(option: AutomatorModeOption) {
-        storeFlow.update { it.copy(automatorMode = option.value, enableAutomator = false) }
+        settingsRepository.updateSettings { it.copy(automatorMode = option.value, enableAutomator = false) }
         A11yService.instance?.shutdown()
         uiAutomationFlow.value?.shutdown()
     }
@@ -324,8 +338,8 @@ class MainViewModel : BaseViewModel(), OnSimpleLife by DefaultSimpleLifeImpl() {
 
     init {
         // preload
-        AppInfoState.appIconMapFlow.value
-        scope.launchTry(Dispatchers.IO) {
+        appInfoRepository.appIconMapFlow.value
+        scope.launchLogged(Dispatchers.IO) {
             // 每次进入删除缓存
             FolderUtils.clearCache()
         }
@@ -334,7 +348,7 @@ class MainViewModel : BaseViewModel(), OnSimpleLife by DefaultSimpleLifeImpl() {
             updateStatus.checkUpdate()
         }
 
-        scope.launchTry(Dispatchers.IO) {
+        scope.launchLogged(Dispatchers.IO) {
             trimCrashDataFiles()
             val list = (FolderUtils.crashTempFolder.listFiles() ?: emptyArray()).mapNotNull {
                 try {
@@ -361,8 +375,5 @@ class MainViewModel : BaseViewModel(), OnSimpleLife by DefaultSimpleLifeImpl() {
             }
         }
 
-        // for OnSimpleLife
-        onCreated()
-        addCloseable { onDestroyed() }
     }
 }

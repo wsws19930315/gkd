@@ -7,14 +7,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.flow.MutableStateFlow
-import li.gkd.app.MainViewModel
+import kotlinx.coroutines.flow.StateFlow
 import li.gkd.app.notif.NotificationCatalog
-import li.gkd.app.notif.StopServiceReceiver
 import li.gkd.app.permission.PermissionStates
 import li.gkd.app.ui.component.PerfIcon
 import li.gkd.app.snapshot.SnapshotCapture
-import li.gkd.app.util.launchTry
+import li.gkd.app.ui.share.launchUi
 import li.gkd.app.util.IntentUtils
 
 class ButtonService : OverlayWindowService(
@@ -22,7 +22,7 @@ class ButtonService : OverlayWindowService(
 ) {
     override fun onClickView() {
         if (isOverlayContentHidden) return
-        scope.launchTry {
+        lifecycleScope.launchUi {
             withAllOverlaysHidden {
                 SnapshotCapture.capture()
             }
@@ -45,16 +45,18 @@ class ButtonService : OverlayWindowService(
     }
 
     init {
-        useAliveFlow(isRunning)
-        useAliveToast("快照按钮服务")
+        useServicePresence(
+            stateFlow = isRunning,
+            name = "快照按钮服务",
+        )
         onCreated {
             NotificationCatalog.button().startForeground()
         }
-        StopServiceReceiver.autoRegister()
     }
 
     companion object {
-        val isRunning = MutableStateFlow(false)
+        val isRunning: StateFlow<Boolean>
+            field = MutableStateFlow(false)
         fun start() {
             if (!PermissionStates.drawOverlays.checkOrToast()) return
             IntentUtils.startForegroundServiceByClass(ButtonService::class)
@@ -62,18 +64,5 @@ class ButtonService : OverlayWindowService(
 
         fun stop() = IntentUtils.stopServiceByClass(ButtonService::class)
 
-        suspend fun setEnabled(mainVm: MainViewModel, enabled: Boolean) {
-            if (!enabled) {
-                stop()
-                return
-            }
-            if (!mainVm.permissionRequests.ensurePermissions(
-                    PermissionStates.foregroundServiceSpecialUse,
-                    PermissionStates.notification,
-                    PermissionStates.drawOverlays,
-                )
-            ) return
-            start()
-        }
     }
 }

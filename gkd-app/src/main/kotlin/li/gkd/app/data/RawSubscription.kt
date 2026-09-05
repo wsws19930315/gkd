@@ -17,14 +17,14 @@ import kotlinx.serialization.json.long
 import li.gkd.app.a11y.selectorTypeModel
 import li.gkd.app.util.LogUtils
 import li.gkd.app.util.ScreenUtils
-import li.gkd.app.util.AppInfoState
+import li.gkd.app.appInfoRepository
 import li.gkd.app.util.distinctByIfAny
 import li.gkd.app.util.filterIfNotAll
 import li.gkd.app.util.json
 import li.gkd.app.util.toJson5String
-import li.gkd.app.util.toast
+import li.gkd.app.util.ToastUtils.toast
 import li.gkd.db.LOCAL_SUBS_IDS
-import li.gkd.db.SubsConfig
+import li.gkd.db.RuleGroupType
 import li.songe.json5.Json5
 import li.gkd.selector.Selector
 import li.gkd.selector.SelectorCompileResult
@@ -117,7 +117,7 @@ data class RawSubscription(
     fun getApp(appId: String): RawApp {
         return apps.find { a -> a.id == appId } ?: RawApp(
             id = appId,
-            name = AppInfoState.appInfoMapFlow.value[appId]?.name,
+            name = appInfoRepository.appInfoMapFlow.value[appId]?.name,
             groups = emptyList()
         )
     }
@@ -376,8 +376,8 @@ data class RawSubscription(
 
         val groupType: Int
             get() = when (this) {
-                is RawAppGroup -> SubsConfig.AppGroupType
-                is RawGlobalGroup -> SubsConfig.GlobalGroupType
+                is RawAppGroup -> RuleGroupType.App
+                is RawGlobalGroup -> RuleGroupType.Global
             }
     }
 

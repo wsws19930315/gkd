@@ -1,5 +1,7 @@
 package li.gkd.app.util
 
+import li.gkd.app.util.ToastUtils.toast
+
 import java.net.Inet6Address
 import java.net.InetAddress
 import java.net.NetworkInterface

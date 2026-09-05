@@ -50,7 +50,7 @@
             android:name=".MainActivity"
             android:enableOnBackInvokedCallback="false"
             android:exported="true"
-            android:launchMode="singleTop"
+            android:launchMode="singleTask"
             android:theme="@style/SplashScreenTheme"
             tools:ignore="UnusedAttribute">
             <intent-filter>

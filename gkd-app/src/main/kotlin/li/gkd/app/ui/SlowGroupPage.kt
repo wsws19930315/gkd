@@ -1,5 +1,8 @@
 package li.gkd.app.ui
 
+import li.gkd.app.feature.subscription.SubsAppGroupListRoute
+import li.gkd.app.feature.subscription.SubsGlobalGroupListRoute
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -30,9 +33,9 @@ import li.gkd.app.ui.share.LocalMainViewModel
 import li.gkd.app.ui.style.EmptyHeight
 import li.gkd.app.ui.style.itemPadding
 import li.gkd.app.ui.style.scaffoldPadding
-import li.gkd.app.util.AppInfoState
-import li.gkd.app.util.launchAsFn
-import li.gkd.app.util.SubsState
+import li.gkd.app.appInfoRepository
+import li.gkd.app.ui.share.launchUiAction
+import li.gkd.app.subscriptionState
 import li.gkd.app.util.throttle
 
 @Serializable
@@ -41,8 +44,8 @@ data object SlowGroupRoute : NavKey
 @Composable
 fun SlowGroupPage() {
     val mainVm = LocalMainViewModel.current
-    val ruleSummary by SubsState.ruleSummaryFlow.collectAsStateWithLifecycle()
-    val appInfoCache by AppInfoState.appInfoMapFlow.collectAsStateWithLifecycle()
+    val ruleSummary by subscriptionState.ruleSummaryFlow.collectAsStateWithLifecycle()
+    val appInfoCache by appInfoRepository.appInfoMapFlow.collectAsStateWithLifecycle()
 
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     Scaffold(
@@ -59,7 +62,7 @@ fun SlowGroupPage() {
                 actions = {
                     PerfIconButton(
                         imageVector = PerfIcon.Info,
-                        onClick = throttle(mainVm.scope.launchAsFn {
+                        onClick = throttle(mainVm.scope.launchUiAction {
                             mainVm.dialogRequests.showMessage(
                                 title = "缓慢查询",
                                 text = arrayOf(

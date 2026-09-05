@@ -1,43 +1,29 @@
 package li.gkd.app.store
 
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.StateFlow
 import li.gkd.app.appScope
+import li.gkd.app.app.AppContainer
+import li.gkd.app.data.settings.SettingsRepository
+import li.gkd.app.data.settings.SettingsStore
 import li.gkd.app.service.ExposeService
-import li.gkd.app.util.AppListString
-import li.gkd.app.util.launchTry
-import li.gkd.app.util.toast
+import li.gkd.app.util.launchLogged
+import li.gkd.app.util.ToastUtils.toast
 
-val storeFlow by lazy {
-    createAnyFlow(
-        key = "store",
-        default = { SettingsStore() }
-    )
-}
+val settingsRepository: SettingsRepository
+    get() = AppContainer.settingsRepository
 
-val actionCountFlow by lazy {
-    createTextFlow(
-        key = "action_count",
-        decode = { it?.toLongOrNull() ?: 0L },
-        encode = { it.toString() },
-    )
-}
+val storeFlow: StateFlow<SettingsStore>
+    get() = settingsRepository.settings
 
-val blockMatchAppListFlow by lazy {
-    createTextFlow(
-        key = "block_match_app_list",
-        decode = { it?.let(AppListString::decode) ?: AppListString.getDefaultBlockList() },
-        encode = AppListString::encode,
-    )
-}
+val actionCountFlow: StateFlow<Long>
+    get() = settingsRepository.actionCount
 
-val blockA11yAppListFlow by lazy {
-    createTextFlow(
-        key = "block_a11y_app_list",
-        decode = { it?.let(AppListString::decode) ?: emptySet() },
-        encode = AppListString::encode,
-    )
-}
+val blockMatchAppListFlow: StateFlow<Set<String>>
+    get() = settingsRepository.blockMatchAppList
+
+val blockA11yAppListFlow: StateFlow<Set<String>>
+    get() = settingsRepository.blockA11yAppList
 
 val actualBlockA11yAppList: Set<String>
     get() = if (storeFlow.value.blockA11yAppListFollowMatch) {
@@ -46,13 +32,8 @@ val actualBlockA11yAppList: Set<String>
         blockA11yAppListFlow.value
     }
 
-val a11yScopeAppListFlow by lazy {
-    createTextFlow(
-        key = "a11y_scope_app_list",
-        decode = { it?.let(AppListString::decode) ?: setOf("com.tencent.mm") },
-        encode = AppListString::encode,
-    )
-}
+val a11yScopeAppListFlow: StateFlow<Set<String>>
+    get() = settingsRepository.a11yScopeAppList
 
 val actualA11yScopeAppList: Set<String>
     get() = if (storeFlow.value.useAutomation) {
@@ -71,13 +52,9 @@ fun checkAppBlockMatch(appId: String): Boolean {
     return false
 }
 
-fun initStore() = appScope.launchTry(Dispatchers.IO) {
+fun initStore() = appScope.launchLogged(Dispatchers.IO) {
     // preload
-    storeFlow.value
-    actionCountFlow.value
-    blockMatchAppListFlow.value
-    blockA11yAppListFlow.value
-    a11yScopeAppListFlow.value
+    settingsRepository.settings.value
     ExposeService.initCommandFile()
 }
 
@@ -87,10 +64,10 @@ fun switchStoreEnableMatch() {
     } else {
         toast("开启规则匹配")
     }
-    storeFlow.update { it.copy(enableMatch = !it.enableMatch) }
+    settingsRepository.updateSettings { it.copy(enableMatch = !it.enableMatch) }
 }
 
 fun updateEnableAutomator(value: Boolean) {
     if (value == storeFlow.value.enableAutomator) return
-    storeFlow.update { it.copy(enableAutomator = value) }
+    settingsRepository.updateSettings { it.copy(enableAutomator = value) }
 }

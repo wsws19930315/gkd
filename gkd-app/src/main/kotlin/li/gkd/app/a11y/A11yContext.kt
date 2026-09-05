@@ -4,10 +4,10 @@ import android.util.Log
 import android.util.LruCache
 import android.view.accessibility.AccessibilityNodeInfo
 import kotlinx.atomicfu.atomic
+import kotlinx.coroutines.CancellationException
 import li.gkd.app.META
 import li.gkd.app.data.ResolvedRule
 import li.gkd.app.priv.toHidden
-import li.gkd.app.util.InterruptRuleMatchException
 import li.gkd.selector.FastQuery
 import li.gkd.selector.MatchOptions
 import li.gkd.selector.Selector
@@ -39,6 +39,8 @@ class A11yContext(
     private val a11yEngine: A11yRuleEngine,
     private val interruptable: Boolean = true,
 ) {
+    private class RuleMatchInterrupted : CancellationException()
+
     private var childCache =
         LruCache<Pair<AccessibilityNodeInfo, Int>, AccessibilityNodeInfo>(MAX_CACHE_SIZE)
     private var indexCache = LruCache<AccessibilityNodeInfo, Int>(MAX_CACHE_SIZE)
@@ -126,7 +128,7 @@ class A11yContext(
         if (META.debuggable) {
             Log.d("guardInterrupt", "中断 rule=${rule.statusText()}")
         }
-        throw InterruptRuleMatchException()
+        throw RuleMatchInterrupted()
     }
 
     private fun getA11Root(): AccessibilityNodeInfo? {

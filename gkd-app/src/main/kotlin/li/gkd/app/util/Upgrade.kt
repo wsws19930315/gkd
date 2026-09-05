@@ -1,5 +1,7 @@
 package li.gkd.app.util
 
+import li.gkd.app.util.ToastUtils.toast
+
 import android.content.Intent
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -20,6 +22,7 @@ import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.util.cio.writeChannel
 import io.ktor.utils.io.copyAndClose
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -32,6 +35,7 @@ import li.gkd.app.app
 import li.gkd.app.store.createAnyFlow
 import li.gkd.app.store.storeFlow
 import li.gkd.app.ui.component.AppAlertDialog
+import li.songe.codeorigin.CallSite
 import java.io.File
 import java.net.URI
 import kotlin.time.Duration.Companion.days
@@ -78,22 +82,39 @@ class UpdateStatus(val scope: CoroutineScope) {
 
     val canRecheck get() = System.currentTimeMillis() - lastCheckTime > 1.days.inWholeMilliseconds
 
-    fun checkUpdate(manual: Boolean = false) = scope.launchTry(Dispatchers.IO, silent = !manual) {
-        lastManual = manual
-        checkUpdatingMutex.whenUnLock {
-            lastCheckTime = System.currentTimeMillis()
-            if (!NetworkUtils.isAvailable()) {
-                error("网络不可用")
+    fun checkUpdate(
+        manual: Boolean = false,
+        @CallSite loc: String = "",
+    ) {
+        scope.launchLogged(Dispatchers.IO, loc = loc) {
+            try {
+                lastManual = manual
+                checkUpdatingMutex.tryWithStateLock {
+                    lastCheckTime = System.currentTimeMillis()
+                    if (!NetworkUtils.isAvailable()) {
+                        error("网络不可用")
+                    }
+                    val newVersion = client.get(UPDATE_URL).body<NewVersion>()
+                    if (newVersion.versionCode <= META.versionCode) {
+                        if (manual) toast("暂无更新", loc = loc)
+                        return@tryWithStateLock
+                    }
+                    if (
+                        !manual &&
+                        ignoreVersionListFlow.value.contains(newVersion.versionCode)
+                    ) return@tryWithStateLock
+                    newVersionFlow.value = newVersion
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (manual) {
+                    toast(e.message ?: e.stackTraceToString(), loc = "")
+                }
+                throw e
             }
-            val newVersion = client.get(UPDATE_URL).body<NewVersion>()
-            if (newVersion.versionCode <= META.versionCode) {
-                if (manual) toast("暂无更新")
-                return@launchTry
-            }
-            if (!manual && ignoreVersionListFlow.value.contains(newVersion.versionCode)) return@launchTry
-            newVersionFlow.value = newVersion
         }
-    }.let { }
+    }
 
     private fun startDownload(newVersion: NewVersion) {
         if (downloadStatusFlow.value is LoadStatus.Loading) return

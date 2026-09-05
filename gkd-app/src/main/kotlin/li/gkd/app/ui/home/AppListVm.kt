@@ -1,5 +1,6 @@
 package li.gkd.app.ui.home
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
@@ -8,15 +9,17 @@ import li.gkd.app.MainViewModel
 import li.gkd.app.data.AppInfo
 import li.gkd.app.permission.PermissionStates
 import li.gkd.app.store.blockMatchAppListFlow
-import li.gkd.app.store.storeFlow
+import li.gkd.app.store.settingsRepository
 import li.gkd.app.ui.share.BaseViewModel
+import li.gkd.app.ui.share.launchUi
 import li.gkd.app.ui.share.useAppFilter
 import li.gkd.app.util.AppSortOption
-import li.gkd.app.util.RuleSummary
-import li.gkd.app.util.AppInfoState
+import li.gkd.app.domain.rule.RuleSummary
+import li.gkd.app.appInfoRepository
 import li.gkd.app.util.findOption
-import li.gkd.app.util.SubsState
+import li.gkd.app.subscriptionState
 import li.gkd.app.util.switchItem
+import li.gkd.app.util.ToastUtils.toast
 
 data class AppListUiState(
     val appInfos: List<AppInfo>,
@@ -94,7 +97,7 @@ class AppListVm(mainVm: MainViewModel) : BaseViewModel() {
         appFilter.appListFlow,
         appFilter.searchStrFlow,
         appFilter.showAllAppFlow,
-        SubsState.ruleSummaryFlow,
+        subscriptionState.ruleSummaryFlow,
         blockMatchAppListFlow,
     ) { appInfos, searchText, showAllApps, ruleSummary, whiteListAppIds ->
         AppListContentState(
@@ -107,8 +110,8 @@ class AppListVm(mainVm: MainViewModel) : BaseViewModel() {
     }
     private val environment = combine(
         PermissionStates.queryPackages.stateFlow,
-        AppInfoState.appListAuthAbnormalFlow,
-        AppInfoState.updateAppMutex.state,
+        appInfoRepository.appListAuthAbnormalFlow,
+        appInfoRepository.updating,
     ) { canQueryPackages, queryPackagesAbnormal, refreshing ->
         AppListEnvironment(
             canQueryPackages = canQueryPackages,
@@ -129,13 +132,13 @@ class AppListVm(mainVm: MainViewModel) : BaseViewModel() {
                 appInfos = appFilter.appListFlow.value,
                 searchText = appFilter.searchStrFlow.value,
                 showAllApps = appFilter.showAllAppFlow.value,
-                ruleSummary = SubsState.ruleSummaryFlow.value,
+                ruleSummary = subscriptionState.ruleSummaryFlow.value,
                 whiteListAppIds = blockMatchAppListFlow.value,
             ),
             environment = AppListEnvironment(
                 canQueryPackages = PermissionStates.queryPackages.stateFlow.value,
-                queryPackagesAbnormal = AppInfoState.appListAuthAbnormalFlow.value,
-                refreshing = AppInfoState.updateAppMutex.state.value,
+                queryPackagesAbnormal = appInfoRepository.appListAuthAbnormalFlow.value,
+                refreshing = appInfoRepository.updating.value,
             ),
         ),
     )
@@ -153,11 +156,11 @@ class AppListVm(mainVm: MainViewModel) : BaseViewModel() {
     }
 
     fun setSearchText(value: String) {
-        appFilter.searchStrFlow.value = value.trim()
+        appFilter.updateSearchStr(value.trim())
     }
 
     fun closeSearch() {
-        appFilter.searchStrFlow.value = ""
+        appFilter.updateSearchStr("")
         showSearchBarFlow.value = false
     }
 
@@ -166,7 +169,7 @@ class AppListVm(mainVm: MainViewModel) : BaseViewModel() {
             if (appFilter.searchStrFlow.value.isEmpty()) {
                 showSearchBarFlow.value = false
             } else {
-                appFilter.searchStrFlow.value = ""
+                appFilter.updateSearchStr("")
             }
         } else {
             showSearchBarFlow.value = true
@@ -189,22 +192,25 @@ class AppListVm(mainVm: MainViewModel) : BaseViewModel() {
     }
 
     fun setSortType(value: AppSortOption) {
-        storeFlow.update { it.copy(appSort = value.value) }
+        settingsRepository.updateSettings { it.copy(appSort = value.value) }
     }
 
     fun setAppGroupType(value: Int) {
-        storeFlow.update { it.copy(appGroupType = value) }
+        settingsRepository.updateSettings { it.copy(appGroupType = value) }
     }
 
     fun setShowBlockApp(value: Boolean) {
-        storeFlow.update { it.copy(showBlockApp = value) }
+        settingsRepository.updateSettings { it.copy(showBlockApp = value) }
     }
 
     fun toggleWhiteList(appId: String) {
-        blockMatchAppListFlow.update { it.switchItem(appId) }
+        settingsRepository.updateBlockMatchAppList { it.switchItem(appId) }
     }
 
     fun refresh() {
-        AppInfoState.updateAllAppInfo()
+        scope.launchUi(Dispatchers.IO) {
+            appInfoRepository.refresh()
+            toast("应用列表更新成功")
+        }
     }
 }

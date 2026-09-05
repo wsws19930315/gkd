@@ -16,10 +16,10 @@ import li.gkd.app.store.storeFlow
 import li.gkd.app.util.LogUtils
 import li.gkd.app.util.ScreenUtils
 import li.gkd.app.snapshot.SnapshotCapture
-import li.gkd.app.util.SubscriptionResult
-import li.gkd.app.util.SubscriptionStore
+import li.gkd.app.data.subscription.SubscriptionResult
+import li.gkd.app.subscriptionRepository
 import li.gkd.app.util.UpdateTimeOption
-import li.gkd.app.util.launchTry
+import li.gkd.app.util.launchLogged
 import li.gkd.app.util.mapState
 import li.gkd.selector.MatchOptions
 import li.gkd.selector.Selector
@@ -91,7 +91,7 @@ private fun watchCaptureScreenshot() {
     selector.match(event, a11yEventAdapter, MatchOptions(fastQuery = false)).let {
         if (it == null) return
     }
-    appScope.launchTry {
+    appScope.launchLogged {
         SnapshotCapture.capture()
     }
 }
@@ -107,9 +107,9 @@ private fun watchAutoUpdateSubs() {
         interval.coerceAtLeast(UpdateTimeOption.Everyday.value)
     ) return
     autoRefreshPending = true
-    appScope.launchTry {
+    appScope.launchLogged {
         try {
-            val result = SubscriptionStore.refresh()
+            val result = subscriptionRepository.refresh()
             if (result !is SubscriptionResult.Busy) {
                 lastUpdateSubsTime = currentTime
             }
@@ -139,7 +139,7 @@ private fun createVolumeReceiver() = object : BroadcastReceiver() {
             val t = System.currentTimeMillis()
             if (t - lastVolumeTriggerTime > 3000 && !ScreenUtils.isScreenLock()) {
                 lastVolumeTriggerTime = t
-                appScope.launchTry {
+                appScope.launchLogged {
                     SnapshotCapture.capture()
                 }
             }

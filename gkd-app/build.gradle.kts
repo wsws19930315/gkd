@@ -19,7 +19,6 @@ plugins {
     alias(libs.plugins.kotlin.parcelize)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.kotlinx.atomicfu)
     alias(libs.plugins.remap)
     alias(libs.plugins.codeorigin)
 }
@@ -53,6 +52,8 @@ android {
         aidl = true
         resValues = true
     }
+
+    sourceSets.getByName("androidTest").assets.srcDir(project(":gkd-db").file("schemas"))
 
     val gkdStoreFile = buildProperty("GKD_STORE_FILE").orNull
     val gkdSigningConfig = if (gkdStoreFile != null) {
@@ -233,6 +234,8 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso)
+    androidTestImplementation(libs.androidx.room.testing)
+    androidTestImplementation(libs.androidx.sqlite.framework)
 
     // AndroidTest shares this runtime dependency with the app and requires the newer version.
     implementation(libs.androidx.concurrent.futures)

@@ -44,7 +44,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import li.gkd.app.R
 import li.gkd.app.store.storeFlow
 import li.gkd.app.ui.SlowGroupRoute
-import li.gkd.app.ui.UpsertRuleGroupRoute
+import li.gkd.app.feature.subscription.UpsertRuleGroupRoute
 import li.gkd.app.ui.WebViewRoute
 import li.gkd.app.ui.component.AnimationFloatingActionButton
 import li.gkd.app.ui.component.AppAlertDialog
@@ -59,19 +59,20 @@ import li.gkd.app.ui.component.rememberMultiSelectionState
 import li.gkd.app.ui.component.rememberReorderSession
 import li.gkd.app.ui.component.rememberPinnedListScrollState
 import li.gkd.app.ui.share.ListPlaceholder
-import li.gkd.app.ui.share.Loadable
+import li.gkd.app.core.state.Loadable
 import li.gkd.app.ui.share.LocalMainViewModel
 import li.gkd.app.ui.style.EmptyHeight
 import li.gkd.db.LOCAL_SUBS_ID
 import li.gkd.app.util.ShortUrlSet
-import li.gkd.app.util.SubscriptionResult
+import li.gkd.app.data.subscription.SubscriptionResult
+import li.gkd.app.ui.share.message
 import li.gkd.app.util.UpdateTimeOption
 import li.gkd.app.util.findOption
 import li.gkd.app.util.getUpDownTransform
-import li.gkd.app.util.launchTry
-import li.gkd.app.util.SubsState
+import li.gkd.app.ui.share.launchUi
+import li.gkd.app.subscriptionState
 import li.gkd.app.util.throttle
-import li.gkd.app.util.toast
+import li.gkd.app.util.ToastUtils.toast
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
@@ -120,7 +121,7 @@ private fun useLoadedSubsManagePage(
     val settingsDialogVisible by vm.settingsDialogVisibleFlow.collectAsStateWithLifecycle()
     val powerWarningItem by vm.powerWarningItemFlow.collectAsStateWithLifecycle()
     val store by storeFlow.collectAsStateWithLifecycle()
-    val ruleSummary by SubsState.ruleSummaryFlow.collectAsStateWithLifecycle()
+    val ruleSummary by subscriptionState.ruleSummaryFlow.collectAsStateWithLifecycle()
     val subItems = state.subItems
     val subsIdToRaw = state.subscriptions
     val scope = vm.scope
@@ -247,12 +248,12 @@ private fun useLoadedSubsManagePage(
                                     imageVector = PerfIcon.Delete,
                                     contentDescription = "删除选中订阅",
                                     onClick = {
-                                        scope.launchTry {
+                                        scope.launchUi {
                                             if (!mainVm.dialogRequests.confirm(
                                                 title = "删除订阅",
                                                 text = text,
                                                 error = true,
-                                            )) return@launchTry
+                                            )) return@launchUi
                                             val result = vm.deleteSubscriptions(canDeleteIds)
                                             result.message?.let {
                                                 toast(it)
@@ -382,8 +383,8 @@ private fun useLoadedSubsManagePage(
                     if (refreshing) {
                         toast("正在刷新订阅,请稍后操作")
                     } else {
-                        scope.launchTry {
-                            val url = mainVm.subsLinkDialog.request() ?: return@launchTry
+                        scope.launchUi {
+                            val url = mainVm.subsLinkDialog.request() ?: return@launchUi
                             vm.addOrModifySubscription(url).message?.let { toast(it) }
                         }
                     }

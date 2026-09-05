@@ -1,7 +1,7 @@
 package li.gkd.app.data
 
 import li.gkd.app.a11y.launcherAppId
-import li.gkd.app.util.AppInfoState
+import li.gkd.app.appInfoRepository
 
 data class GlobalApp(
     val id: String,
@@ -87,7 +87,7 @@ class GlobalRule(
             if (!matchLauncher && appId == launcherAppId) {
                 return false
             }
-            if (!matchSystemApp && AppInfoState.systemAppsFlow.value.contains(appId)) {
+            if (!matchSystemApp && appInfoRepository.systemAppsFlow.value.contains(appId)) {
                 return false
             }
             return matchAnyApp

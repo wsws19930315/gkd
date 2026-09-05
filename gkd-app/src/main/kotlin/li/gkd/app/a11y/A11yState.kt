@@ -8,6 +8,7 @@ import android.util.LruCache
 import android.view.accessibility.AccessibilityNodeInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import li.gkd.app.META
@@ -22,17 +23,17 @@ import li.gkd.app.data.ResolvedRule
 import li.gkd.app.data.RuleStatus
 import li.gkd.app.data.insert
 import li.gkd.app.data.isSystem
-import li.gkd.db.Db
 import li.gkd.app.service.updateTopTaskAppId
 import li.gkd.app.store.actionCountFlow
 import li.gkd.app.store.checkAppBlockMatch
 import li.gkd.app.util.AndroidTarget
 import li.gkd.app.util.LogUtils
-import li.gkd.app.util.AppInfoState
-import li.gkd.app.util.RuleSummary
-import li.gkd.app.util.launchTry
-import li.gkd.app.util.SubsState
+import li.gkd.app.appInfoRepository
+import li.gkd.app.domain.rule.RuleSummary
+import li.gkd.app.util.launchLogged
+import li.gkd.app.subscriptionState
 import li.gkd.app.util.systemUiAppId
+import li.gkd.db.Db
 import li.songe.codeorigin.CallSite
 
 data class TopActivity(
@@ -63,7 +64,8 @@ data class TopActivity(
     }
 }
 
-val topActivityFlow = MutableStateFlow(TopActivity())
+val topActivityFlow: StateFlow<TopActivity>
+    field = MutableStateFlow(TopActivity())
 private var lastValidActivity: TopActivity = topActivityFlow.value
     set(value) {
         if (value.activityId != null) {
@@ -80,7 +82,7 @@ private object ActivityCache : LruCache<Pair<String, String>, Boolean>(256) {
     override fun create(key: Pair<String, String>): Boolean = try {
         app.packageManager.getActivityInfo(
             ComponentName(key.first, key.second),
-            AppInfoState.PKG_FLAGS
+            appInfoRepository.packageFlags
         )
         true
     } catch (_: PackageManager.NameNotFoundException) {
@@ -130,7 +132,8 @@ class ActivityRule(
         get() = currentRules.any { r -> r.checkForced() && (r.status == RuleStatus.StatusOk || r.status == RuleStatus.Status5) }
 }
 
-val activityRuleFlow = MutableStateFlow(ActivityRule())
+val activityRuleFlow: StateFlow<ActivityRule>
+    field = MutableStateFlow(ActivityRule())
 
 private var lastAppId = ""
 
@@ -187,15 +190,15 @@ fun updateTopActivity(
     if (tempActivityLogList.size >= 16 || appId == META.appId) {
         val logs = tempActivityLogList.toTypedArray()
         tempActivityLogList.clear()
-        appScope.launchTry {
+        appScope.launchLogged {
             Db.activityLogDao.insert(*logs)
         }
     }
     if (activityLogCount++ % 100 == 0) {
-        appScope.launchTry { Db.activityLogDao.deleteKeepLatest() }
+        appScope.launchLogged { Db.activityLogDao.deleteKeepLatest() }
     }
     val topActivity = topActivityFlow.value
-    val ruleSummary = SubsState.ruleSummaryFlow.value
+    val ruleSummary = subscriptionState.ruleSummaryFlow.value
     val topChanged = idChanged || oldActivityRule.topActivity != topActivity
     val ruleChanged = oldActivityRule.ruleSummary !== ruleSummary
     if (topChanged || ruleChanged) {
@@ -206,8 +209,8 @@ fun updateTopActivity(
         if (idChanged) {
             val oldAppId = lastAppId
             lastAppId = appId
-            appScope.launchTry {
-                Db.appVisitLogDao.insert(oldAppId, appId, t)
+            appScope.launchLogged {
+                Db.appLastVisitDao.insert(oldAppId, appId, t)
             }
             appChangeTime = t
             ruleSummary.globalRules.forEach { it.resetState(t) }
@@ -284,7 +287,7 @@ fun addActionLog(
     topActivity: TopActivity,
     target: AccessibilityNodeInfo,
     actionResult: ActionResult,
-) = appScope.launchTry(Dispatchers.IO) {
+) = appScope.launchLogged(Dispatchers.IO) {
     val ctime = System.currentTimeMillis()
     actionLogMutex.withLock {
         val actionLog = ActionLog(

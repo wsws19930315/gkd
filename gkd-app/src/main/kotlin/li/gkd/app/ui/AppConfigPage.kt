@@ -1,5 +1,9 @@
 package li.gkd.app.ui
 
+import li.gkd.app.feature.log.ActionLogRoute
+import li.gkd.app.feature.subscription.SubsAppGroupListRoute
+import li.gkd.app.feature.subscription.UpsertRuleGroupRoute
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -52,14 +56,14 @@ import li.gkd.app.ui.component.PerfIcon
 import li.gkd.app.ui.component.PerfIconButton
 import li.gkd.app.ui.component.PerfTopAppBar
 import li.gkd.app.ui.component.RuleGroupCard
-import li.gkd.app.ui.component.ShowGroupState
+import li.gkd.app.domain.rule.RuleGroupTarget
 import li.gkd.app.ui.component.animateListItem
 import li.gkd.app.ui.component.rememberMultiSelectionState
-import li.gkd.app.ui.component.toGroupState
+import li.gkd.app.domain.rule.toRuleGroupTarget
 import li.gkd.app.ui.component.rememberListScrollState
 import li.gkd.app.ui.icon.BackCloseIcon
 import li.gkd.app.ui.share.ListPlaceholder
-import li.gkd.app.ui.share.Loadable
+import li.gkd.app.core.state.Loadable
 import li.gkd.app.ui.share.LocalMainViewModel
 import li.gkd.app.ui.share.noRippleClickable
 import li.gkd.app.ui.style.EmptyHeight
@@ -67,11 +71,11 @@ import li.gkd.app.ui.style.iconTextSize
 import li.gkd.app.ui.style.scaffoldPadding
 import li.gkd.db.LOCAL_SUBS_ID
 import li.gkd.app.util.RuleSortOption
-import li.gkd.app.util.copyText
+import li.gkd.app.util.ToastUtils.copyText
 import li.gkd.app.util.findOption
-import li.gkd.app.util.launchTry
+import li.gkd.app.ui.share.launchUi
 import li.gkd.app.util.throttle
-import li.gkd.app.util.toast
+import li.gkd.app.util.ToastUtils.toast
 
 @Serializable
 data class AppConfigRoute(
@@ -101,10 +105,10 @@ fun AppConfigPage(route: AppConfigRoute) {
 
     val allGroupStates = remember(subsPairs, appId) {
         subsPairs.flatMap { (entry, groups) ->
-            groups.map { group -> group.toGroupState(entry.subsItem.id, appId) }
+            groups.map { group -> group.toRuleGroupTarget(entry.subsItem.id, appId) }
         }.toSet()
     }
-    val selectionState = rememberMultiSelectionState<ShowGroupState>()
+    val selectionState = rememberMultiSelectionState<RuleGroupTarget>()
     val selectedDataSet = selectionState.selectedKeys
     val isSelectedMode = selectionState.active
     LaunchedEffect(allGroupStates) {
@@ -115,7 +119,7 @@ fun AppConfigPage(route: AppConfigRoute) {
     }
 
     val updateSelected: (Boolean?) -> Unit = { enabled ->
-        scope.launchTry {
+        scope.launchUi {
             val action = when (enabled) {
                 false -> "关闭"
                 true -> "启用"
@@ -124,7 +128,7 @@ fun AppConfigPage(route: AppConfigRoute) {
             if (!mainVm.dialogRequests.confirm(
                 title = "操作提示",
                 text = "是否将所选规则全部${action}?\n\n注: 也可在「订阅-规则类别」操作",
-            )) return@launchTry
+            )) return@launchUi
             val changedSize = vm.updateSelectedEnabled(selectedDataSet, enabled)
             if (changedSize > 0) {
                 val result = if (enabled == null) "重置" else if (enabled) "已启用" else "已关闭"
@@ -202,7 +206,7 @@ fun AppConfigPage(route: AppConfigRoute) {
                                 imageVector = PerfIcon.ContentCopy,
                                 enabled = selectedDataSet.any { a -> a.appId != null },
                                 onClick = throttle {
-                                    scope.launchTry {
+                                    scope.launchUi {
                                         copyText(vm.buildSelectedGroupsText(selectedDataSet))
                                     }
                                 },
@@ -361,7 +365,7 @@ fun AppConfigPage(route: AppConfigRoute) {
                     val onLongClick = {
                         if (groupSize > 1 && !isSelectedMode) {
                             selectionState.selectOnly(
-                                group.toGroupState(
+                                group.toRuleGroupTarget(
                                     subsId = subsId,
                                     appId = appId,
                                 ),
@@ -370,7 +374,7 @@ fun AppConfigPage(route: AppConfigRoute) {
                     }
                     val onSelectedChange = {
                         selectionState.toggle(
-                            group.toGroupState(
+                            group.toRuleGroupTarget(
                                 subsId = subsId,
                                 appId = appId,
                             )
@@ -391,7 +395,7 @@ fun AppConfigPage(route: AppConfigRoute) {
                             )
                         },
                         onCheckedChange = { enabled ->
-                            scope.launchTry(Dispatchers.Default) {
+                            scope.launchUi(Dispatchers.Default) {
                                 vm.setGroupEnabled(entry.subscription, group, subsConfig, enabled)
                             }
                         },

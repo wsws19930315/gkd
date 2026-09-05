@@ -26,18 +26,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
-import li.gkd.db.CategoryConfig
 import li.gkd.app.data.ExcludeData
 import li.gkd.app.data.RawSubscription
-import li.gkd.db.SubsConfig
-import li.gkd.app.ui.getGlobalGroupChecked
+import li.gkd.app.a11y.launcherAppId
+import li.gkd.app.domain.rule.RuleGroupPolicy
 import li.gkd.app.ui.icon.ResetSettings
 import li.gkd.app.ui.share.noRippleClickable
-import li.gkd.app.util.SubsState
+import li.gkd.app.appInfoRepository
 import li.gkd.app.util.throttle
 import java.util.Objects
+import li.gkd.db.SubsCategoryConfig
+import li.gkd.db.SubsGroupConfig
 
 
 @Composable
@@ -46,8 +48,8 @@ fun RuleGroupCard(
     subs: RawSubscription,
     appId: String?,
     group: RawSubscription.RawGroupProps,
-    subsConfig: SubsConfig?,
-    categoryConfig: CategoryConfig?,
+    subsConfig: SubsGroupConfig?,
+    categoryConfig: SubsCategoryConfig?,
     switchEnabled: Boolean = true,
     onOpen: () -> Unit,
     onCheckedChange: (Boolean) -> Unit,
@@ -87,15 +89,18 @@ fun RuleGroupCard(
     val excludeData = remember(subsConfig?.exclude) {
         ExcludeData.parse(subsConfig?.exclude)
     }
+    val systemApps by appInfoRepository.systemAppsFlow.collectAsStateWithLifecycle()
     val checked = if (inGlobalAppPage) {
-        getGlobalGroupChecked(
+        RuleGroupPolicy.getGlobalGroupChecked(
             subs,
             excludeData,
             group,
             appId,
+            launcherAppId,
+            systemApps,
         )
     } else {
-        SubsState.getGroupEnable(
+        RuleGroupPolicy.getGroupEnabled(
             group,
             subsConfig,
             category,
@@ -227,33 +232,6 @@ fun RuleGroupCard(
         }
     }
 }
-
-fun getActualGroupChecked(
-    subs: RawSubscription,
-    group: RawSubscription.RawGroupProps,
-    appId: String?,
-    subsConfig: SubsConfig?,
-    categoryConfig: CategoryConfig?,
-): Boolean {
-    if (!group.valid) return false
-    val inGlobalAppPage = appId != null && group is RawSubscription.RawGlobalGroup
-    return if (inGlobalAppPage) {
-        getGlobalGroupChecked(
-            subs,
-            ExcludeData.parse(subsConfig?.exclude),
-            group,
-            appId,
-        )
-    } else {
-        SubsState.getGroupEnable(
-            group,
-            subsConfig,
-            subs.getCategory(group.name),
-            categoryConfig,
-        )
-    } ?: false
-}
-
 
 @Composable
 fun BatchActionButtonGroup(

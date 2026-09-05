@@ -7,13 +7,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.MutableStateFlow
+import li.gkd.app.priv.AutomationService
 import li.gkd.app.priv.uiAutomationOccupiedFlow
 import li.gkd.app.service.A11yService
 import li.gkd.app.ui.PrivilegeServiceRoute
 import li.gkd.app.ui.component.AppAlertDialog
 import li.gkd.app.ui.component.TermsAcceptDialog
 import li.gkd.app.ui.share.LocalMainViewModel
-import li.gkd.app.util.toast
+import li.gkd.app.util.ToastUtils.toast
 
 @Composable
 fun AppOverlayHost() {
@@ -37,14 +38,22 @@ fun AppOverlayHost() {
     }
 }
 
-val accessRestrictedSettingsShowFlow = MutableStateFlow(false)
+private val accessRestrictedSettingsShowFlow = MutableStateFlow(false)
+
+fun showAccessRestrictedSettingsDialog() {
+    accessRestrictedSettingsShowFlow.value = true
+}
+
+private fun dismissAccessRestrictedSettingsDialog() {
+    accessRestrictedSettingsShowFlow.value = false
+}
 
 @Composable
 private fun AccessRestrictedSettingsDlg() {
     val a11yRunning by A11yService.isRunning.collectAsStateWithLifecycle()
     LaunchedEffect(a11yRunning) {
         if (a11yRunning) {
-            accessRestrictedSettingsShowFlow.value = false
+            dismissAccessRestrictedSettingsDialog()
         }
     }
     val accessRestrictedSettingsShow by accessRestrictedSettingsShowFlow.collectAsStateWithLifecycle()
@@ -53,7 +62,7 @@ private fun AccessRestrictedSettingsDlg() {
     LaunchedEffect(isPrivilegeServicePage, accessRestrictedSettingsShow) {
         if (isPrivilegeServicePage && accessRestrictedSettingsShow && !a11yRunning) {
             toast("请重新授权以解除限制")
-            accessRestrictedSettingsShowFlow.value = false
+            dismissAccessRestrictedSettingsDialog()
         }
     }
     if (accessRestrictedSettingsShow && !isPrivilegeServicePage && !a11yRunning) {
@@ -65,11 +74,11 @@ private fun AccessRestrictedSettingsDlg() {
                 Text(text = "当前操作权限「访问受限设置」已被限制，请前往特权服务重新授权")
             },
             onDismissRequest = {
-                accessRestrictedSettingsShowFlow.value = false
+                dismissAccessRestrictedSettingsDialog()
             },
             confirmButton = {
                 TextButton({
-                    accessRestrictedSettingsShowFlow.value = false
+                    dismissAccessRestrictedSettingsDialog()
                     mainVm.navigatePage(PrivilegeServiceRoute)
                 }) {
                     Text(text = "前往授权")
@@ -77,7 +86,7 @@ private fun AccessRestrictedSettingsDlg() {
             },
             dismissButton = {
                 TextButton({
-                    accessRestrictedSettingsShowFlow.value = false
+                    dismissAccessRestrictedSettingsDialog()
                 }) {
                     Text(text = "关闭")
                 }
@@ -91,7 +100,7 @@ private fun UiAutomationAlreadyRegisteredDlg() {
     if (uiAutomationOccupiedFlow.collectAsStateWithLifecycle().value) {
         AppAlertDialog(
             onDismissRequest = {
-                uiAutomationOccupiedFlow.value = false
+                AutomationService.dismissOccupiedWarning()
             },
             title = { Text(text = "启动失败") },
             text = {
@@ -99,7 +108,7 @@ private fun UiAutomationAlreadyRegisteredDlg() {
             },
             confirmButton = {
                 TextButton(onClick = {
-                    uiAutomationOccupiedFlow.value = false
+                    AutomationService.dismissOccupiedWarning()
                 }) {
                     Text(text = "我知道了")
                 }

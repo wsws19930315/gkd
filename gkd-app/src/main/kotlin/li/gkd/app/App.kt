@@ -30,9 +30,17 @@ import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import li.gkd.app.a11y.initA11yFeat
+import li.gkd.app.app.AppContainer
 import li.gkd.app.data.CrashData
+import li.gkd.app.data.subscription.SubscriptionRepository
+import li.gkd.app.data.subscription.SubscriptionState
+import li.gkd.app.data.snapshot.SnapshotRepository
+import li.gkd.app.data.backup.BackupManager
+import li.gkd.app.data.appinfo.AppInfoRepository
 import li.gkd.app.data.selfAppInfo
 import li.gkd.app.notif.NotificationChannels
+import li.gkd.app.platform.lifecycle.MainActivityVisibility
+import li.gkd.app.platform.lifecycle.RuntimeStateSynchronizer
 import li.gkd.app.priv.gkdPrivilegeUiConfig
 import li.gkd.app.priv.initPrivilege
 import li.gkd.app.service.clearHttpSubs
@@ -40,13 +48,11 @@ import li.gkd.app.service.initA11yWhiteAppList
 import li.gkd.app.store.initStore
 import li.gkd.app.util.AndroidTarget
 import li.gkd.app.util.LogUtils
-import li.gkd.app.util.AppInfoState
 import li.gkd.app.util.FolderUtils
 import li.gkd.app.util.deviceInfoDesc
-import li.gkd.app.util.SubscriptionStore
-import li.gkd.app.util.initToast
-import li.gkd.app.util.launchTry
-import li.gkd.app.util.toast
+import li.gkd.app.util.ToastUtils.initToast
+import li.gkd.app.util.launchLogged
+import li.gkd.app.util.ToastUtils.toast
 import li.gkd.db.Db
 import li.gkd.db.initialize
 import org.lsposed.hiddenapibypass.HiddenApiBypass
@@ -61,6 +67,21 @@ val appScope by lazy { MainScope() }
 private lateinit var innerApp: App
 val app: App
     get() = innerApp
+
+val appInfoRepository: AppInfoRepository
+    get() = AppInfoRepository
+
+val subscriptionRepository: SubscriptionRepository
+    get() = SubscriptionRepository
+
+val subscriptionState: SubscriptionState
+    get() = SubscriptionState
+
+val snapshotRepository: SnapshotRepository
+    get() = AppContainer.snapshotRepository
+
+val backupManager: BackupManager
+    get() = BackupManager
 
 private val applicationInfo by lazy {
     app.packageManager.getApplicationInfo(
@@ -163,7 +184,7 @@ class App : Application() {
     }
 
     fun getPkgInfo(appId: String): PackageInfo? = try {
-        packageManager.getPackageInfo(appId, AppInfoState.PKG_FLAGS)
+        packageManager.getPackageInfo(appId, appInfoRepository.packageFlags)
     } catch (_: PackageManager.NameNotFoundException) {
         null
     }
@@ -229,7 +250,7 @@ class App : Application() {
             toast(e.message ?: e.toString())
             LogUtils.d("UncaughtExceptionHandler", t, e)
             val mtime = System.currentTimeMillis()
-            appScope.launchTry(Dispatchers.IO) {
+            appScope.launchLogged(Dispatchers.IO) {
                 CrashData(
                     id = mtime,
                     mtime = mtime,
@@ -244,7 +265,7 @@ class App : Application() {
                     stackTrace = Log.getStackTraceString(e),
                 ).save()
                 delay(1500.milliseconds)
-                if (isActivityVisible) {
+                if (MainActivityVisibility.isVisible) {
                     startLaunchActivity()
                 }
                 android.os.Process.killProcess(android.os.Process.myPid())
@@ -254,17 +275,17 @@ class App : Application() {
         initToast()
         initStore()
         NotificationChannels.initialize()
-        AppInfoState.initAppState()
+        appInfoRepository.initialize()
         initA11yFeat()
         initPrivilege()
-        appScope.launchTry(Dispatchers.IO) {
+        appScope.launchLogged(Dispatchers.IO) {
             PrivilegeUi.startSilently(gkdPrivilegeUiConfig)
         }
-        appScope.launchTry(Dispatchers.IO) {
-            SubscriptionStore.initialize()
+        appScope.launchLogged(Dispatchers.IO) {
+            subscriptionRepository.initialize()
         }
         initA11yWhiteAppList()
         clearHttpSubs()
-        syncFixState()
+        RuntimeStateSynchronizer.requestSync()
     }
 }

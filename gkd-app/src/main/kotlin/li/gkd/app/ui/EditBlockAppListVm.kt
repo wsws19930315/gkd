@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.map
 import li.gkd.app.store.blockMatchAppListFlow
+import li.gkd.app.store.settingsRepository
 import li.gkd.app.ui.share.BaseViewModel
 import li.gkd.app.util.AppListString
 
@@ -32,6 +33,12 @@ class EditBlockAppListVm : BaseViewModel() {
 
     fun setText(value: String) {
         textFlow.value = value
+    }
+
+    fun saveChanges(): Boolean {
+        val newSet = getChangedSet() ?: return false
+        settingsRepository.replaceBlockMatchAppList(newSet)
+        return true
     }
 
 }

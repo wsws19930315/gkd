@@ -27,7 +27,7 @@ import li.gkd.app.util.GithubCookieException
 import li.gkd.app.util.LoadStatus
 import li.gkd.app.util.LogUtils
 import li.gkd.app.util.throttle
-import li.gkd.app.util.toast
+import li.gkd.app.util.ToastUtils.toast
 import li.gkd.app.util.uploadFileToGithub
 import java.io.File
 

@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 import li.gkd.app.a11y.MAX_CHILD_SIZE
 import li.gkd.app.a11y.topActivityFlow
 import li.gkd.app.util.LogUtils
-import li.gkd.app.util.toast
+import li.gkd.app.util.ToastUtils.toast
 import kotlin.system.measureTimeMillis
 
 @Serializable
@@ -219,4 +219,3 @@ fun info2nodeList(root: AccessibilityNodeInfo?): List<NodeInfo> {
         )
     }
 }
-

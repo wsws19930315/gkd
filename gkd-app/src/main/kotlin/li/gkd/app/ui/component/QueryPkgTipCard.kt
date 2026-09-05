@@ -16,9 +16,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import li.gkd.app.permission.PermissionStates
 import li.gkd.app.ui.share.LocalMainViewModel
-import li.gkd.app.util.launchAsFn
+import li.gkd.app.ui.share.launchUiAction
 import li.gkd.app.util.throttle
-import li.gkd.app.util.AppInfoState
+import li.gkd.app.appInfoRepository
 
 @Composable
 fun QueryPkgAuthCard(
@@ -42,8 +42,8 @@ fun QueryPkgAuthCard(
             textAlign = TextAlign.Center,
         )
         TextButton(
-            enabled = !AppInfoState.updateAppMutex.state.collectAsStateWithLifecycle().value,
-            onClick = throttle(fn = mainVm.scope.launchAsFn {
+            enabled = !appInfoRepository.updating.collectAsStateWithLifecycle().value,
+            onClick = throttle(fn = mainVm.scope.launchUiAction {
                 mainVm.permissionRequests.ensurePermissions(PermissionStates.queryPackages)
             })
         ) {

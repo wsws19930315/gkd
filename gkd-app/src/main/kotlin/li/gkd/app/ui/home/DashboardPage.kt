@@ -37,7 +37,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import li.gkd.app.MainActivity
 import li.gkd.app.R
-import li.gkd.db.SubsConfig
+import li.gkd.app.subscriptionState
 import li.gkd.app.permission.PermissionStates
 import li.gkd.app.priv.PrivilegeServiceStatus
 import li.gkd.app.priv.privilegeContextFlow
@@ -46,17 +46,19 @@ import li.gkd.app.priv.uiAutomationFlow
 import li.gkd.app.service.A11yService
 import li.gkd.app.service.ActivityService
 import li.gkd.app.service.StatusService
+import li.gkd.app.platform.service.ServiceController
 import li.gkd.app.service.a11yPartDisabledFlow
 import li.gkd.app.service.switchAutomatorService
 import li.gkd.app.service.topAppIdFlow
 import li.gkd.app.store.actualA11yScopeAppList
+import li.gkd.app.store.actionCountFlow
 import li.gkd.app.store.storeFlow
-import li.gkd.app.ui.ActionLogRoute
-import li.gkd.app.ui.ActivityLogRoute
+import li.gkd.app.feature.log.ActionLogRoute
+import li.gkd.app.feature.log.ActivityLogRoute
 import li.gkd.app.ui.AppConfigRoute
 import li.gkd.app.ui.PrivilegeServiceRoute
 import li.gkd.app.ui.WebViewRoute
-import li.gkd.app.ui.WorkModeRoute
+import li.gkd.app.feature.settings.WorkModeRoute
 import li.gkd.app.ui.component.GroupNameText
 import li.gkd.app.ui.component.PerfIcon
 import li.gkd.app.ui.component.PerfIconButton
@@ -70,16 +72,19 @@ import li.gkd.app.ui.style.itemHorizontalPadding
 import li.gkd.app.ui.style.itemVerticalPadding
 import li.gkd.app.ui.style.surfaceCardColors
 import li.gkd.app.util.HOME_PAGE_URL
-import li.gkd.app.util.SubsState
-import li.gkd.app.util.launchTry
+import li.gkd.app.ui.share.launchUi
+import li.gkd.app.ui.share.statusText
 import li.gkd.app.util.throttle
+import li.gkd.db.RuleGroupType
 
 @Composable
 fun useDashboardPage(): ScaffoldExt {
     val context = LocalActivity.current as MainActivity
     val mainVm = LocalMainViewModel.current
     val vm = viewModel<DashboardVm>()
-    val subsStatus by vm.subsStatusFlow.collectAsStateWithLifecycle()
+    val ruleSummary by subscriptionState.ruleSummaryFlow.collectAsStateWithLifecycle()
+    val actionCount by actionCountFlow.collectAsStateWithLifecycle()
+    val subsStatus = ruleSummary.statusText(actionCount)
     val store by storeFlow.collectAsStateWithLifecycle()
     val privilegeContext by privilegeContextFlow.collectAsStateWithLifecycle()
     val privilegeServiceStatus by privilegeServiceStatusFlow.collectAsStateWithLifecycle()
@@ -220,8 +225,14 @@ fun useDashboardPage(): ScaffoldExt {
                 checked = manageRunning && store.enableStatusService,
                 onCheckedChange = {
                     if (it) {
-                        vm.scope.launchTry {
-                            StatusService.requestStart(mainVm)
+                        vm.scope.launchUi {
+                            if (mainVm.permissionRequests.ensurePermissions(
+                                    PermissionStates.foregroundServiceSpecialUse,
+                                    PermissionStates.notification,
+                                )
+                            ) {
+                                ServiceController.setStatusEnabled(true)
+                            }
                         }
                     } else {
                         vm.stopStatusService()
@@ -229,12 +240,12 @@ fun useDashboardPage(): ScaffoldExt {
                 },
             )
 
-            val latestRecord by SubsState.latestRecordFlow.collectAsStateWithLifecycle()
-            val latestRecordDesc by SubsState.latestRecordDescFlow.collectAsStateWithLifecycle()
+            val latestRecord by subscriptionState.latestRecordFlow.collectAsStateWithLifecycle()
+            val latestRecordDesc by subscriptionState.latestRecordDescFlow.collectAsStateWithLifecycle()
             TriggerOverviewCard(
                 subsStatus = subsStatus,
                 latestRecordDesc = latestRecordDesc,
-                latestRecordIsGlobal = latestRecord?.groupType == SubsConfig.GlobalGroupType,
+                latestRecordIsGlobal = latestRecord?.groupType == RuleGroupType.Global,
                 onOpenActionLog = { mainVm.navigatePage(ActionLogRoute()) },
                 onOpenLatestRecord = {
                     latestRecord?.let {

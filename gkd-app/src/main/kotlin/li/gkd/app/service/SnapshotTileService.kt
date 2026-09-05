@@ -2,21 +2,19 @@ package li.gkd.app.service
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.isActive
 import li.gkd.app.a11y.A11yRuleEngine
 import li.gkd.app.appScope
+import li.gkd.app.ui.share.launchUi
 import li.gkd.app.util.LogUtils
 import li.gkd.app.snapshot.SnapshotCapture
-import li.gkd.app.util.launchTry
-import li.gkd.app.util.toast
+import li.gkd.app.util.ToastUtils.toast
 
-class SnapshotTileService() : BaseTileService() {
-    override val activeFlow = MutableStateFlow(false)
+class SnapshotTileService : BaseTileService() {
+    override val activeFlow = flowOf(false)
 
-    init {
-        onTileClicked { execSnapshot() }
-    }
+    override fun onTileClick() = execSnapshot()
 }
 
 private fun execSnapshot() {
@@ -27,13 +25,13 @@ private fun execSnapshot() {
         toast("服务未连接", forced = true)
         return
     }
-    appScope.launchTry(Dispatchers.IO) {
+    appScope.launchUi(Dispatchers.IO) {
         val oldAppId = service.safeActiveWindowAppId
 
         if (oldAppId == null) {
             A11yRuleEngine.performActionBack()
             toast("获取信息根节点失败", forced = true)
-            return@launchTry
+            return@launchUi
         }
 
         val startTime = System.currentTimeMillis()
@@ -54,7 +52,7 @@ private fun execSnapshot() {
             } else if (latestAppId != oldAppId) {
                 ok = true
                 LogUtils.d("SnapshotTileService::eventExecutor.execute")
-                appScope.launchTry { SnapshotCapture.capture(forcedCropStatusBar = true) }
+                SnapshotCapture.capture(forcedCropStatusBar = true)
                 break
             } else {
                 A11yRuleEngine.performActionBack()

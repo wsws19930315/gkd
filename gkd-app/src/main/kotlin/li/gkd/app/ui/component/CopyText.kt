@@ -32,7 +32,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
-import li.gkd.app.util.copyText
+import li.gkd.app.util.ToastUtils.copyText
 import li.gkd.app.util.throttle
 
 @Composable

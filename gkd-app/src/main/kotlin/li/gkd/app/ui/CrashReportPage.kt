@@ -47,7 +47,7 @@ import li.gkd.app.ui.component.PerfIconButton
 import li.gkd.app.ui.component.PerfTopAppBar
 import li.gkd.app.ui.component.rememberListScrollState
 import li.gkd.app.ui.share.LocalMainViewModel
-import li.gkd.app.ui.share.Loadable
+import li.gkd.app.core.state.Loadable
 import li.gkd.app.ui.share.noRippleClickable
 import li.gkd.app.ui.style.EmptyHeight
 import li.gkd.app.ui.style.itemHorizontalPadding
@@ -56,9 +56,9 @@ import li.gkd.app.ui.style.scaffoldPadding
 import li.gkd.app.ui.style.surfaceCardColors
 import li.gkd.app.util.ISSUES_URL
 import li.gkd.app.util.format
-import li.gkd.app.util.launchTry
+import li.gkd.app.ui.share.launchUi
 import li.gkd.app.util.throttle
-import li.gkd.app.util.toast
+import li.gkd.app.util.ToastUtils.toast
 
 
 @Serializable
@@ -99,13 +99,13 @@ fun CrashReportPage() {
                             imageVector = PerfIcon.Delete,
                             contentDescription = "清空崩溃记录",
                             onClick = throttle {
-                                actionScope.launchTry {
+                                actionScope.launchUi {
                                     if (!mainVm.dialogRequests.confirm(
                                             title = "清空崩溃记录",
                                             text = "确定删除全部崩溃记录？",
                                             error = true,
                                         )
-                                    ) return@launchTry
+                                    ) return@launchUi
                                     vm.deleteAllCrashes()
                                     toast("删除成功")
                                 }
@@ -154,13 +154,13 @@ fun CrashReportPage() {
                         vm.toggleCrash(crashData.id)
                     },
                     onDelete = throttle {
-                        actionScope.launchTry {
+                        actionScope.launchUi {
                             if (!mainVm.dialogRequests.confirm(
                                     title = "删除崩溃记录",
                                     text = "确定删除这条崩溃记录？",
                                     error = true,
                                 )
-                            ) return@launchTry
+                            ) return@launchUi
                             vm.deleteCrash(crashData)
                             toast("删除成功")
                         }

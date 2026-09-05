@@ -33,33 +33,35 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import li.gkd.app.META
-import li.gkd.app.MainViewModel
 import li.gkd.app.appScope
 import li.gkd.db.A11yEventLog
 import li.gkd.app.data.toA11yEventLog
-import li.gkd.db.Db
 import li.gkd.app.notif.NotificationCatalog
-import li.gkd.app.notif.StopServiceReceiver
 import li.gkd.app.permission.PermissionStates
 import li.gkd.app.priv.uiAutomationFlow
-import li.gkd.app.ui.EventLogCard
+import li.gkd.app.feature.log.EventLogCard
 import li.gkd.app.ui.component.PerfIcon
 import li.gkd.app.ui.component.PerfIconButton
 import li.gkd.app.ui.component.rememberLazyListAutoFollowState
 import li.gkd.app.util.IntentUtils
-import li.gkd.app.util.launchTry
+import li.gkd.app.util.launchLogged
+import li.gkd.db.Db
 import kotlin.time.Duration.Companion.milliseconds
 
 class EventService : OverlayWindowService(positionKey = "event") {
 
-    val eventLogs = mutableStateListOf<A11yEventLog>()
+    private val eventLogs = mutableStateListOf<A11yEventLog>()
     private var minimized by mutableStateOf(false)
 
     override fun isViewClickEnabled(): Boolean = minimized
@@ -156,36 +158,43 @@ class EventService : OverlayWindowService(positionKey = "event") {
         }
     }
 
-    val tempEventListFlow = MutableStateFlow(emptyList<A11yEventLog>()).apply {
-        appScope.launch {
-            while (scope.isActive) {
-                delay(1000.milliseconds)
-                val list = getAndUpdate { emptyList() }
-                if (list.isNotEmpty()) {
-                    Db.a11yEventLogDao.insert(list)
-                }
-            }
+    private val tempEventListFlow = MutableStateFlow(emptyList<A11yEventLog>())
+
+    private suspend fun flushEventLogs() = withContext(NonCancellable) {
+        val list = tempEventListFlow.getAndUpdate { emptyList() }
+        if (list.isNotEmpty()) {
+            Db.a11yEventLogDao.insert(list)
         }
     }
 
     init {
-        logAutoId = 0
-        instance = this
+        useLogLifecycle()
+        onCreated {
+            logAutoId = 0
+            instance = this@EventService
+            lifecycleScope.launch {
+                logAutoId = (Db.a11yEventLogDao.maxId() ?: 0).coerceAtLeast(1)
+            }
+            lifecycleScope.launch {
+                try {
+                    while (isActive) {
+                        delay(1000.milliseconds)
+                        flushEventLogs()
+                    }
+                } finally {
+                    flushEventLogs()
+                }
+            }
+            NotificationCatalog.event().startForeground()
+        }
         onDestroyed {
             instance = null
             logAutoId = 0
         }
-        scope.launch {
-            logAutoId = (Db.a11yEventLogDao.maxId() ?: 0).coerceAtLeast(1)
-        }
-
-        useLogLifecycle()
-        useAliveFlow(isRunning)
-        useAliveToast("事件服务")
-        StopServiceReceiver.autoRegister()
-        onCreated {
-            NotificationCatalog.event().startForeground()
-        }
+        useServicePresence(
+            stateFlow = isRunning,
+            name = "事件服务",
+        )
     }
 
     companion object {
@@ -204,11 +213,12 @@ class EventService : OverlayWindowService(positionKey = "event") {
                 service.eventLogs.removeRange(0, 64)
             }
             if (eventLog.id % 100 == 0) {
-                appScope.launchTry { Db.a11yEventLogDao.deleteKeepLatest() }
+                appScope.launchLogged { Db.a11yEventLogDao.deleteKeepLatest() }
             }
         }
 
-        val isRunning = MutableStateFlow(false)
+        val isRunning: StateFlow<Boolean>
+            field = MutableStateFlow(false)
         fun start() {
             if (!PermissionStates.drawOverlays.checkOrToast()) return
             IntentUtils.startForegroundServiceByClass(EventService::class)
@@ -216,18 +226,5 @@ class EventService : OverlayWindowService(positionKey = "event") {
 
         fun stop() = IntentUtils.stopServiceByClass(EventService::class)
 
-        suspend fun setEnabled(mainVm: MainViewModel, enabled: Boolean) {
-            if (!enabled) {
-                stop()
-                return
-            }
-            if (!mainVm.permissionRequests.ensurePermissions(
-                    PermissionStates.foregroundServiceSpecialUse,
-                    PermissionStates.notification,
-                    PermissionStates.drawOverlays,
-                )
-            ) return
-            start()
-        }
     }
 }
