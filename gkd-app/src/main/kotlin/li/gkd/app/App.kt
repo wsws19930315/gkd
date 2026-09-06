@@ -18,6 +18,8 @@ import android.hardware.input.InputManager
 import android.media.projection.MediaProjectionManager
 import android.net.Uri
 import android.os.PowerManager
+import android.os.Process.killProcess
+import android.os.Process.myPid
 import android.provider.Settings
 import android.util.Log
 import android.view.Display
@@ -30,22 +32,20 @@ import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import li.gkd.app.a11y.initA11yFeat
-import li.gkd.app.app.AppContainer
 import li.gkd.app.data.CrashData
 import li.gkd.app.data.subscription.SubscriptionRepository
-import li.gkd.app.data.subscription.SubscriptionState
-import li.gkd.app.data.snapshot.SnapshotRepository
-import li.gkd.app.data.backup.BackupManager
 import li.gkd.app.data.appinfo.AppInfoRepository
 import li.gkd.app.data.selfAppInfo
 import li.gkd.app.notif.NotificationChannels
 import li.gkd.app.platform.lifecycle.MainActivityVisibility
 import li.gkd.app.platform.lifecycle.RuntimeStateSynchronizer
+import li.gkd.app.priv.PrivilegeOwnerLifecycle
 import li.gkd.app.priv.gkdPrivilegeUiConfig
 import li.gkd.app.priv.initPrivilege
+import li.gkd.app.service.ExposeService
 import li.gkd.app.service.clearHttpSubs
 import li.gkd.app.service.initA11yWhiteAppList
-import li.gkd.app.store.initStore
+import li.gkd.app.store.AppStore
 import li.gkd.app.util.AndroidTarget
 import li.gkd.app.util.LogUtils
 import li.gkd.app.util.FolderUtils
@@ -56,9 +56,7 @@ import li.gkd.app.util.ToastUtils.toast
 import li.gkd.db.Db
 import li.gkd.db.initialize
 import org.lsposed.hiddenapibypass.HiddenApiBypass
-import priv.kit.core.PrivilegeConfig
 import priv.kit.ui.PrivilegeUi
-import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.milliseconds
 
 
@@ -67,21 +65,6 @@ val appScope by lazy { MainScope() }
 private lateinit var innerApp: App
 val app: App
     get() = innerApp
-
-val appInfoRepository: AppInfoRepository
-    get() = AppInfoRepository
-
-val subscriptionRepository: SubscriptionRepository
-    get() = SubscriptionRepository
-
-val subscriptionState: SubscriptionState
-    get() = SubscriptionState
-
-val snapshotRepository: SnapshotRepository
-    get() = AppContainer.snapshotRepository
-
-val backupManager: BackupManager
-    get() = BackupManager
 
 private val applicationInfo by lazy {
     app.packageManager.getApplicationInfo(
@@ -135,10 +118,6 @@ class App : Application() {
 
     override fun attachBaseContext(base: Context?) {
         super.attachBaseContext(base)
-        PrivilegeConfig.configure(
-            followDeathDelayMillis = 0,
-            activeReconnectOnOwnerDeath = false,
-        )
         if (AndroidTarget.P) {
             HiddenApiBypass.addHiddenApiExemptions("L")
         }
@@ -184,7 +163,7 @@ class App : Application() {
     }
 
     fun getPkgInfo(appId: String): PackageInfo? = try {
-        packageManager.getPackageInfo(appId, appInfoRepository.packageFlags)
+        packageManager.getPackageInfo(appId, AppInfoRepository.packageFlags)
     } catch (_: PackageManager.NameNotFoundException) {
         null
     }
@@ -246,43 +225,57 @@ class App : Application() {
         super.onCreate()
         Db.initialize(this, FolderUtils.dbFolder.resolve("gkd.db").absolutePath)
         LogUtils.d()
+        installCrashHandler()
+        initializeRuntimeComponents()
+    }
+
+    private fun installCrashHandler() {
         Thread.setDefaultUncaughtExceptionHandler { t, e ->
             toast(e.message ?: e.toString())
             LogUtils.d("UncaughtExceptionHandler", t, e)
             val mtime = System.currentTimeMillis()
             appScope.launchLogged(Dispatchers.IO) {
-                CrashData(
-                    id = mtime,
-                    mtime = mtime,
-                    device = deviceInfoDesc,
-                    androidVersionCode = android.os.Build.VERSION.SDK_INT,
-                    androidVersionName = android.os.Build.VERSION.RELEASE,
-                    versionCode = META.versionCode,
-                    versionName = META.versionName,
-                    name = e::class.java.name,
-                    message = e.message,
-                    thread = t.name,
-                    stackTrace = Log.getStackTraceString(e),
-                ).save()
-                delay(1500.milliseconds)
-                if (MainActivityVisibility.isVisible) {
-                    startLaunchActivity()
+                try {
+                    CrashData(
+                        id = mtime,
+                        mtime = mtime,
+                        device = deviceInfoDesc,
+                        androidVersionCode = android.os.Build.VERSION.SDK_INT,
+                        androidVersionName = android.os.Build.VERSION.RELEASE,
+                        versionCode = META.versionCode,
+                        versionName = META.versionName,
+                        name = e::class.java.name,
+                        message = e.message,
+                        thread = t.name,
+                        stackTrace = Log.getStackTraceString(e),
+                    ).save()
+                    delay(1500.milliseconds)
+                    if (MainActivityVisibility.isVisible) {
+                        startLaunchActivity()
+                        PrivilegeOwnerLifecycle.prepareAppRestart()
+                    }
+                } finally {
+                    killProcess(myPid())
                 }
-                android.os.Process.killProcess(android.os.Process.myPid())
-                exitProcess(0)
             }
         }
+    }
+
+    private fun initializeRuntimeComponents() {
         initToast()
-        initStore()
+        AppStore.initialize()
+        appScope.launchLogged(Dispatchers.IO) {
+            ExposeService.initCommandFile()
+        }
         NotificationChannels.initialize()
-        appInfoRepository.initialize()
+        AppInfoRepository.initialize()
         initA11yFeat()
         initPrivilege()
         appScope.launchLogged(Dispatchers.IO) {
             PrivilegeUi.startSilently(gkdPrivilegeUiConfig)
         }
         appScope.launchLogged(Dispatchers.IO) {
-            subscriptionRepository.initialize()
+            SubscriptionRepository.initialize()
         }
         initA11yWhiteAppList()
         clearHttpSubs()

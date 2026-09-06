@@ -27,7 +27,7 @@ import li.gkd.app.permission.PermissionRequests
 import li.gkd.app.permission.PermissionStates
 import li.gkd.app.service.StatusService
 import li.gkd.app.service.updateTopTaskAppId
-import li.gkd.app.store.storeFlow
+import li.gkd.app.store.AppStore.storeFlow
 import li.gkd.app.ui.share.ActivityImeController
 import li.gkd.app.ui.share.ActivityResultRequests
 import li.gkd.app.ui.share.FixedWindowInsets

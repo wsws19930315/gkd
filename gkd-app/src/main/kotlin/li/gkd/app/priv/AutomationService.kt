@@ -17,7 +17,7 @@ import kotlinx.coroutines.withContext
 import li.gkd.app.a11y.A11yCommonImpl
 import li.gkd.app.a11y.A11yRuleEngine
 import li.gkd.app.a11y.A11yRuntime
-import li.gkd.app.store.updateEnableAutomator
+import li.gkd.app.store.AppStore.updateEnableAutomator
 import li.gkd.app.util.AndroidTarget
 import li.gkd.app.util.AutomatorModeOption
 import li.gkd.app.util.LogUtils

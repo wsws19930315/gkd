@@ -7,7 +7,7 @@ import kotlinx.coroutines.Job
 import li.gkd.app.a11y.appChangeTime
 import li.gkd.app.a11y.lastTriggerRule
 import li.gkd.app.a11y.lastTriggerTime
-import li.gkd.app.store.settingsRepository
+import li.gkd.app.store.AppStore
 import li.gkd.selector.MatchOptions
 import li.gkd.selector.Selector
 
@@ -111,7 +111,6 @@ sealed class ResolvedRule(
     }
 
     private var preRules = emptySet<ResolvedRule>()
-    val hasNext = group.rules.any { r -> r.preKeys?.any { k -> k == rule.key } == true }
 
     private var actionDelayTriggerTime = atomic(0L)
     val actionDelayJob = atomic<Job?>(null)
@@ -136,7 +135,7 @@ sealed class ResolvedRule(
         actionCount.incrementAndGet()
         lastTriggerTime = t
         lastTriggerRule = this
-        settingsRepository.incrementActionCount()
+        AppStore.incrementActionCount()
     }
 
     private var actionCount = atomic(0)

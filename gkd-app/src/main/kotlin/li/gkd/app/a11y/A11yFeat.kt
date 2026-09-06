@@ -12,12 +12,12 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import li.gkd.app.app
 import li.gkd.app.appScope
-import li.gkd.app.store.storeFlow
+import li.gkd.app.store.AppStore.storeFlow
 import li.gkd.app.util.LogUtils
 import li.gkd.app.util.ScreenUtils
 import li.gkd.app.snapshot.SnapshotCapture
 import li.gkd.app.data.subscription.SubscriptionResult
-import li.gkd.app.subscriptionRepository
+import li.gkd.app.data.subscription.SubscriptionRepository
 import li.gkd.app.util.UpdateTimeOption
 import li.gkd.app.util.launchLogged
 import li.gkd.app.util.mapState
@@ -109,7 +109,7 @@ private fun watchAutoUpdateSubs() {
     autoRefreshPending = true
     appScope.launchLogged {
         try {
-            val result = subscriptionRepository.refresh()
+            val result = SubscriptionRepository.refresh()
             if (result !is SubscriptionResult.Busy) {
                 lastUpdateSubsTime = currentTime
             }

@@ -17,7 +17,7 @@ import li.gkd.app.app
 import li.gkd.app.appScope
 import li.gkd.app.priv.privilegeContextFlow
 import li.gkd.app.util.AndroidTarget
-import li.gkd.app.appInfoRepository
+import li.gkd.app.data.appinfo.AppInfoRepository
 import li.gkd.app.util.ToastUtils.toast
 import li.songe.codeorigin.CallSite
 import priv.kit.core.Privilege
@@ -179,7 +179,7 @@ object PermissionStates {
             purpose = "用于展示设备应用并匹配应用规则",
             permission = PermissionLists.getGetInstalledAppsPermission(),
             onChanged = {
-                appInfoRepository.requestRefresh()
+                AppInfoRepository.requestRefresh()
             },
         )
     }

@@ -10,8 +10,8 @@ import li.gkd.app.data.ExcludeData
 import li.gkd.app.data.ruleconfig.RuleGroupConfigService
 import li.gkd.app.domain.rule.RuleGroupTarget
 import li.gkd.app.data.RawSubscription
-import li.gkd.app.store.storeFlow
-import li.gkd.app.store.settingsRepository
+import li.gkd.app.store.AppStore.storeFlow
+import li.gkd.app.store.AppStore
 import li.gkd.app.ui.share.BaseViewModel
 import li.gkd.app.core.state.Loadable
 import li.gkd.app.ui.share.globalGroupAppOrderListState
@@ -183,21 +183,21 @@ class SubsGlobalGroupExcludeVm(
     }
 
     fun setSortType(value: AppSortOption) {
-        settingsRepository.updateSettings { it.copy(subsExcludeSort = value.value) }
+        AppStore.updateSettings { it.copy(subsExcludeSort = value.value) }
     }
 
     fun setAppGroupType(value: Int) {
-        settingsRepository.updateSettings { it.copy(subsExcludeAppGroupType = value) }
+        AppStore.updateSettings { it.copy(subsExcludeAppGroupType = value) }
     }
 
     fun toggleShowInnerDisabledApps() {
-        settingsRepository.updateSettings {
+        AppStore.updateSettings {
             it.copy(subsExcludeShowInnerDisabledApp = !it.subsExcludeShowInnerDisabledApp)
         }
     }
 
     fun toggleShowBlockApps() {
-        settingsRepository.updateSettings {
+        AppStore.updateSettings {
             it.copy(subsExcludeShowBlockApp = !it.subsExcludeShowBlockApp)
         }
     }

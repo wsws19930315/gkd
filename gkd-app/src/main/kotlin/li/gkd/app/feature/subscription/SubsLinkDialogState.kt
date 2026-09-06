@@ -20,7 +20,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import li.gkd.app.subscriptionRepository
+import li.gkd.app.data.subscription.SubscriptionRepository
 import li.gkd.app.ui.component.AppAlertDialog
 import li.gkd.app.ui.component.PerfIcon
 import li.gkd.app.ui.component.PerfIconButton
@@ -84,7 +84,7 @@ class SubsLinkDialogState(
 
     suspend fun request(initialValue: String = ""): String? {
         val existingUrls = withContext(Dispatchers.IO) {
-            subscriptionRepository.existingUpdateUrls()
+            SubscriptionRepository.existingUpdateUrls()
         }
         val value = withContext(Dispatchers.Main.immediate) {
             requestMutex.withLock {

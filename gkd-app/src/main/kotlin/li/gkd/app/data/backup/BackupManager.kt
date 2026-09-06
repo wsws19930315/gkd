@@ -5,7 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import li.gkd.app.app.AppContainer
+import li.gkd.app.store.AppStore
 import li.gkd.app.data.RawSubscription
 import li.gkd.app.data.subscription.SubscriptionRepository
 import li.gkd.app.data.subscription.SubscriptionFileStore
@@ -34,7 +34,7 @@ object BackupManager {
             try {
                 tempDir.resolve("store").run {
                     mkdir()
-                    AppContainer.settingsRepository.exportBackupEntries().forEach { (filename, text) ->
+                    AppStore.exportBackupEntries().forEach { (filename, text) ->
                         resolve(filename).writeText(text)
                     }
                 }
@@ -92,7 +92,7 @@ object BackupManager {
             val previousFiles = subscriptions.associate { subscription ->
                 subscription.id to SubscriptionFileStore.readBytes(subscription.id)
             }
-            AppContainer.settingsRepository.withBackupRestore(prepared.storeEntries) {
+            AppStore.withBackupRestore(prepared.storeEntries) {
                 try {
                     Db.withTransaction {
                         val skipped = prepared.dbData?.let { Db.subscriptionConfigStore.merge(it) } ?: 0
@@ -118,7 +118,7 @@ object BackupManager {
             } else {
                 null
             }
-            val storeEntries = AppContainer.settingsRepository.backupFilenames.mapNotNull { filename ->
+            val storeEntries = AppStore.backupFilenames.mapNotNull { filename ->
                 val file = unzipDir.resolve("store/$filename")
                 if (!file.exists() || !file.isFile) return@mapNotNull null
                 filename to file.readText()

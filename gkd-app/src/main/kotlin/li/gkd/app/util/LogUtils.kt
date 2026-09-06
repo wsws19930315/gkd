@@ -20,7 +20,7 @@ object LogUtils {
         tag: String = fileName.substringBeforeLast('.'),
     ) {
         val name = Thread.currentThread().name
-        val actualLoc = loc.substring("li.gkd.app.".length)
+        val actualLoc = loc.removePrefix("li.gkd.app.")
         val texts = args.map { stringify(it) }
         if (META.debuggable) {
             val msg = buildString {

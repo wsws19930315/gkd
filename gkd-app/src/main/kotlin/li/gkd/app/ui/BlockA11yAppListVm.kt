@@ -6,8 +6,8 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.map
 import li.gkd.app.MainViewModel
 import li.gkd.app.service.fixRestartAutomatorService
-import li.gkd.app.store.blockA11yAppListFlow
-import li.gkd.app.store.settingsRepository
+import li.gkd.app.store.AppStore.blockA11yAppListFlow
+import li.gkd.app.store.AppStore
 import li.gkd.app.ui.share.BaseViewModel
 import li.gkd.app.ui.share.useAppFilter
 import li.gkd.app.util.AppListString
@@ -40,16 +40,16 @@ class BlockA11yAppListVm(mainVm: MainViewModel) : BaseViewModel() {
     }.stateInit(AppListString.decode(textFlow.value).size)
 
     fun setSortType(value: AppSortOption) {
-        settingsRepository.updateSettings { it.copy(a11yAppSort = value.value) }
+        AppStore.updateSettings { it.copy(a11yAppSort = value.value) }
     }
 
     fun setAppGroupType(value: Int) {
-        settingsRepository.updateSettings { it.copy(a11yAppGroupType = value) }
+        AppStore.updateSettings { it.copy(a11yAppGroupType = value) }
     }
 
     fun toggleFollowMatchList() {
         setSearchBarVisible(false)
-        settingsRepository.updateSettings {
+        AppStore.updateSettings {
             it.copy(blockA11yAppListFollowMatch = !it.blockA11yAppListFollowMatch)
         }
         fixRestartAutomatorService()
@@ -88,7 +88,7 @@ class BlockA11yAppListVm(mainVm: MainViewModel) : BaseViewModel() {
 
     fun saveText() {
         if (textChanged) {
-            settingsRepository.replaceBlockA11yAppList(AppListString.decode(textFlow.value))
+            AppStore.replaceBlockA11yAppList(AppListString.decode(textFlow.value))
             toast("更新成功")
         } else {
             toast("未修改")
@@ -97,6 +97,6 @@ class BlockA11yAppListVm(mainVm: MainViewModel) : BaseViewModel() {
     }
 
     fun toggleApp(appId: String) {
-        settingsRepository.updateBlockA11yAppList { it.switchItem(appId) }
+        AppStore.updateBlockA11yAppList { it.switchItem(appId) }
     }
 }

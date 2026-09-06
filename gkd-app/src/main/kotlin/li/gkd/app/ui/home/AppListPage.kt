@@ -49,7 +49,7 @@ import li.gkd.app.MainActivity
 import li.gkd.app.R
 import li.gkd.app.data.AppInfo
 import li.gkd.app.permission.PermissionStates
-import li.gkd.app.store.storeFlow
+import li.gkd.app.store.AppStore.storeFlow
 import li.gkd.app.ui.AppConfigRoute
 import li.gkd.app.ui.EditBlockAppListRoute
 import li.gkd.app.ui.component.AnimatedIconButton

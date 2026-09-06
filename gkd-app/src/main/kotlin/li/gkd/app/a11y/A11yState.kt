@@ -26,14 +26,14 @@ import li.gkd.app.data.RuleStatus
 import li.gkd.app.data.insert
 import li.gkd.app.data.isSystem
 import li.gkd.app.service.updateTopTaskAppId
-import li.gkd.app.store.actionCountFlow
-import li.gkd.app.store.checkAppBlockMatch
+import li.gkd.app.store.AppStore.actionCountFlow
+import li.gkd.app.store.AppStore.checkAppBlockMatch
 import li.gkd.app.util.AndroidTarget
 import li.gkd.app.util.LogUtils
-import li.gkd.app.appInfoRepository
+import li.gkd.app.data.appinfo.AppInfoRepository
 import li.gkd.app.domain.rule.RuleSummary
 import li.gkd.app.util.launchLogged
-import li.gkd.app.subscriptionState
+import li.gkd.app.data.subscription.SubscriptionState
 import li.gkd.app.util.systemUiAppId
 import li.gkd.db.Db
 import li.songe.codeorigin.CallSite
@@ -77,7 +77,7 @@ private object ActivityCache : LruCache<Pair<String, String>, Boolean>(256) {
     override fun create(key: Pair<String, String>): Boolean = try {
         app.packageManager.getActivityInfo(
             ComponentName(key.first, key.second),
-            appInfoRepository.packageFlags
+            AppInfoRepository.packageFlags
         )
         true
     } catch (_: PackageManager.NameNotFoundException) {
@@ -217,7 +217,7 @@ object A11yState {
         if (activityLogCount++ % 100 == 0) {
             appScope.launchLogged { Db.activityLogDao.deleteKeepLatest() }
         }
-        val ruleSummary = subscriptionState.ruleSummaryFlow.value
+        val ruleSummary = SubscriptionState.ruleSummaryFlow.value
         val topChanged = idChanged || oldActivityRule.topActivity != topActivity
         val ruleChanged = oldActivityRule.ruleSummary !== ruleSummary
         if (topChanged || ruleChanged) {

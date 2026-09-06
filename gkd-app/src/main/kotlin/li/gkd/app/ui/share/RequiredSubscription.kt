@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.stateIn
 import li.gkd.app.core.state.Loadable
 import li.gkd.app.data.RawSubscription
 import li.gkd.app.data.subscription.SubscriptionSnapshot
-import li.gkd.app.subscriptionRepository
+import li.gkd.app.data.subscription.SubscriptionRepository
 
 data class LoadedSubscription(
     val value: RawSubscription,
@@ -52,10 +52,10 @@ class RequiredSubscription(
     }
 
     val state: StateFlow<Loadable<LoadedSubscription>> =
-        subscriptionRepository.snapshotFlow.map(::loadableState).stateIn(
+        SubscriptionRepository.snapshotFlow.map(::loadableState).stateIn(
             scope,
             SharingStarted.Eagerly,
-            loadableState(subscriptionRepository.snapshotFlow.value),
+            loadableState(SubscriptionRepository.snapshotFlow.value),
         )
 
     fun requireValue(): RawSubscription {
@@ -95,5 +95,5 @@ class RequiredSubscription(
 
     suspend fun update(
         transform: (RawSubscription) -> RawSubscription,
-    ): Boolean = subscriptionRepository.update(id, transform)
+    ): Boolean = SubscriptionRepository.update(id, transform)
 }

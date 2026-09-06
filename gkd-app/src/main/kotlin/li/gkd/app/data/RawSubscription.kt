@@ -17,7 +17,7 @@ import kotlinx.serialization.json.long
 import li.gkd.app.a11y.selectorTypeModel
 import li.gkd.app.util.LogUtils
 import li.gkd.app.util.ScreenUtils
-import li.gkd.app.appInfoRepository
+import li.gkd.app.data.appinfo.AppInfoRepository
 import li.gkd.app.util.distinctByIfAny
 import li.gkd.app.util.filterIfNotAll
 import li.gkd.app.util.json
@@ -117,7 +117,7 @@ data class RawSubscription(
     fun getApp(appId: String): RawApp {
         return apps.find { a -> a.id == appId } ?: RawApp(
             id = appId,
-            name = appInfoRepository.appInfoMapFlow.value[appId]?.name,
+            name = AppInfoRepository.appInfoMapFlow.value[appId]?.name,
             groups = emptyList()
         )
     }

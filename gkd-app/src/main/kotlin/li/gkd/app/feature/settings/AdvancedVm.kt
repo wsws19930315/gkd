@@ -1,7 +1,7 @@
 package li.gkd.app.feature.settings
 
-import li.gkd.app.store.storeFlow
-import li.gkd.app.store.settingsRepository
+import li.gkd.app.store.AppStore.storeFlow
+import li.gkd.app.store.AppStore
 import li.gkd.app.ui.share.BaseViewModel
 import li.gkd.app.util.ToastUtils.toast
 
@@ -16,12 +16,12 @@ class AdvancedVm : BaseViewModel() {
         if (newPort == storeFlow.value.httpServerPort) {
             return true
         }
-        settingsRepository.updateSettings { it.copy(httpServerPort = newPort) }
+        AppStore.updateSettings { it.copy(httpServerPort = newPort) }
         toast("更新成功")
         return true
     }
 
     fun setAutoClearMemorySubs(enabled: Boolean) {
-        settingsRepository.updateSettings { it.copy(autoClearMemorySubs = enabled) }
+        AppStore.updateSettings { it.copy(autoClearMemorySubs = enabled) }
     }
 }

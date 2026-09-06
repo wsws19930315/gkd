@@ -12,7 +12,6 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
@@ -81,10 +80,7 @@ class SettingsRepositoryTest {
             }
 
             assertEquals(200L, repository.actionCount.value)
-            withTimeout(5_000) {
-                val file = directory.resolve("action_count.txt")
-                while (file.takeIf { it.isFile }?.readText() != "200") delay(10)
-            }
+            awaitFileText(directory.resolve("action_count.txt"), "200")
         } finally {
             writeScope.cancel()
             directory.deleteRecursively()
@@ -105,16 +101,16 @@ class SettingsRepositoryTest {
             )
 
             repository.incrementActionCount()
-            withTimeout(5_000) {
-                repository.persistenceFailures.first { it.isNotEmpty() }
-            }
+            val failure = runCatching {
+                withTimeout(5_000) {
+                    repository.withBackupRestore(mapOf("action_count.txt" to "100")) { }
+                }
+            }.exceptionOrNull()
+            assertTrue(failure is IOException)
 
             directory.mkdirs()
             repository.incrementActionCount()
-            withTimeout(5_000) { repository.awaitPersistence() }
-
-            assertEquals("2", directory.resolve("action_count.txt").readText())
-            assertEquals(emptyMap<String, Throwable>(), repository.persistenceFailures.value)
+            awaitFileText(directory.resolve("action_count.txt"), "2")
         } finally {
             writeScope.cancel()
             parent.deleteRecursively()
@@ -168,7 +164,7 @@ class SettingsRepositoryTest {
                 repository.incrementActionCount()
                 "committed"
             }
-            withTimeout(5_000) { repository.awaitPersistence() }
+            awaitFileText(directory.resolve("action_count.txt"), "101")
 
             assertEquals("committed", result)
             assertEquals(101L, repository.actionCount.value)
@@ -218,8 +214,7 @@ class SettingsRepositoryTest {
 
             directory.resolve("action_count.txt").delete()
             repository.incrementActionCount()
-            withTimeout(5_000) { repository.awaitPersistence() }
-            assertEquals("1", directory.resolve("action_count.txt").readText())
+            awaitFileText(directory.resolve("action_count.txt"), "1")
         }
     }
 
@@ -234,6 +229,12 @@ class SettingsRepositoryTest {
         } finally {
             writer.cancelAndJoin()
             directory.deleteRecursively()
+        }
+    }
+
+    private suspend fun awaitFileText(file: java.io.File, expected: String) {
+        withTimeout(5_000) {
+            while (file.takeIf { it.isFile }?.readText() != expected) delay(10)
         }
     }
 

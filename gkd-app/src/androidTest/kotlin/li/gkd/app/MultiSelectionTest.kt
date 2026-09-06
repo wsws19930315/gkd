@@ -31,6 +31,7 @@ import kotlin.math.abs
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import li.gkd.app.data.RawSubscription
+import li.gkd.app.data.subscription.SubscriptionRepository
 import li.gkd.app.data.edit
 import li.gkd.app.feature.subscription.SubsAppGroupListRoute
 import li.gkd.app.feature.subscription.SubsGlobalGroupListRoute
@@ -76,7 +77,7 @@ class MultiSelectionTest {
                 .getActivitiesInStage(Stage.RESUMED).filterIsInstance<MainActivity>().single()
         }
         runBlocking {
-            withTimeout(15_000) { subscriptionRepository.awaitSnapshot() }
+            withTimeout(15_000) { SubscriptionRepository.awaitSnapshot() }
             for ((id, name) in listOf(localId to "多选测试本地", remoteId to "多选测试远程")) {
                 val subscription = RawSubscription.parse(
                     """
@@ -93,7 +94,7 @@ class MultiSelectionTest {
                     }
                     """.trimIndent(),
                 )
-                subscriptionRepository.saveWithItem(subscription, SubsItem(id = id, order = -10))
+                SubscriptionRepository.saveWithItem(subscription, SubsItem(id = id, order = -10))
             }
         }
         compose.runOnUiThread { activity.mainVm.acceptTermsStep(0) }
@@ -101,7 +102,7 @@ class MultiSelectionTest {
 
     @After
     fun removeFixtures() {
-        runBlocking { subscriptionRepository.delete(localId, remoteId) }
+        runBlocking { SubscriptionRepository.delete(localId, remoteId) }
         if (::activity.isInitialized) {
             compose.runOnUiThread { activity.finish() }
         }
@@ -288,7 +289,7 @@ class MultiSelectionTest {
     @Test
     fun closeIconCannotNavigateBackDuringItsExitAnimation() {
         runBlocking {
-            subscriptionRepository.update(localId) {
+            SubscriptionRepository.update(localId) {
                 it.copy(name = "用于验证多选顶栏在窄屏和大字体下显示的较长订阅标题")
             }
         }
@@ -377,7 +378,7 @@ class MultiSelectionTest {
             .sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
         runBlocking {
             for (id in listOf(localId, remoteId)) {
-                subscriptionRepository.update(id) { current ->
+                SubscriptionRepository.update(id) { current ->
                     current.edit { removeGlobalGroups { it.key == 1 } }
                 }
             }
@@ -410,7 +411,7 @@ class MultiSelectionTest {
         assertEquals(before, runBlocking { Db.subsItemDao.queryAll().associate { it.id to it.order } })
         compose.onNodeWithContentDescription("更多").performClick()
         compose.onNodeWithText("删除订阅").assertIsDisplayed()
-        assertTrue(runBlocking { subscriptionRepository.awaitSnapshot().subscriptions.containsKey(localId) })
+        assertTrue(runBlocking { SubscriptionRepository.awaitSnapshot().subscriptions.containsKey(localId) })
         InstrumentationRegistry.getInstrumentation()
             .sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
         compose.onNodeWithContentDescription("取消选择").performClick()

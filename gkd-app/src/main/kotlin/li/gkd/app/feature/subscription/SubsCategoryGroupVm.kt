@@ -12,8 +12,8 @@ import li.gkd.app.data.RawSubscription
 import li.gkd.app.data.ruleconfig.RuleGroupConfigService
 import li.gkd.app.domain.rule.RuleGroupPolicy
 import li.gkd.app.data.edit
-import li.gkd.app.store.storeFlow
-import li.gkd.app.store.settingsRepository
+import li.gkd.app.store.AppStore.storeFlow
+import li.gkd.app.store.AppStore
 import li.gkd.app.ui.share.BaseViewModel
 import li.gkd.app.core.state.Loadable
 import li.gkd.app.ui.share.filterSubsApps
@@ -21,9 +21,9 @@ import li.gkd.app.ui.share.subsAppActionOrderMapState
 import li.gkd.app.ui.share.useSubsAppFilter
 import li.gkd.app.util.AppSortOption
 import li.gkd.app.util.EnableGroupOption
-import li.gkd.app.appInfoRepository
+import li.gkd.app.data.appinfo.AppInfoRepository
 import li.gkd.app.util.findOption
-import li.gkd.app.store.blockMatchAppListFlow
+import li.gkd.app.store.AppStore.blockMatchAppListFlow
 import li.gkd.db.SubsAppGroupConfig
 import li.gkd.db.SubsCategoryConfig
 import li.gkd.db.Db
@@ -90,7 +90,7 @@ class SubsCategoryGroupVm(
         val settings = storeFlow.value
         val apps = filterSubsApps(
             apps = rawSubscription.getCategoryApps(route.categoryKey),
-            appMap = appInfoRepository.appInfoMapFlow.value,
+            appMap = AppInfoRepository.appInfoMapFlow.value,
             settings = settings,
             appActionOrderMap = appActionOrderMapState.value.value.orEmpty(),
             appVisitOrderMap = mainVm.appVisitOrderMapState.value.value.orEmpty(),
@@ -123,15 +123,15 @@ class SubsCategoryGroupVm(
     }
 
     fun setSortType(option: AppSortOption) {
-        settingsRepository.updateSettings { it.copy(subsCategorySort = option.value) }
+        AppStore.updateSettings { it.copy(subsCategorySort = option.value) }
     }
 
     fun setAppGroupType(value: Int) {
-        settingsRepository.updateSettings { it.copy(subsCategoryGroupType = value) }
+        AppStore.updateSettings { it.copy(subsCategoryGroupType = value) }
     }
 
     fun toggleShowBlockApps() {
-        settingsRepository.updateSettings { it.copy(subsCategoryShowBlock = !it.subsCategoryShowBlock) }
+        AppStore.updateSettings { it.copy(subsCategoryShowBlock = !it.subsCategoryShowBlock) }
     }
 
     suspend fun toggleCategoryEnabled(): String {

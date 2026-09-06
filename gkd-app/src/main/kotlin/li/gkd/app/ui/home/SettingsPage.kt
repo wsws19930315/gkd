@@ -49,14 +49,14 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
 import li.gkd.app.MainActivity
 import li.gkd.app.R
-import li.gkd.app.subscriptionState
+import li.gkd.app.data.subscription.SubscriptionState
 import li.gkd.app.permission.PermissionStates
 import li.gkd.app.platform.service.ServiceController
 import li.gkd.app.priv.privilegeContextFlow
 import li.gkd.app.service.StatusService
 import li.gkd.app.service.TrackService
-import li.gkd.app.store.storeFlow
-import li.gkd.app.store.actionCountFlow
+import li.gkd.app.store.AppStore.storeFlow
+import li.gkd.app.store.AppStore.actionCountFlow
 import li.gkd.app.feature.settings.AboutRoute
 import li.gkd.app.feature.settings.AdvancedPageRoute
 import li.gkd.app.ui.BlockA11yAppListRoute
@@ -97,7 +97,7 @@ fun useSettingsPage(): ScaffoldExt {
     val mainVm = LocalMainViewModel.current
     val context = LocalActivity.current as MainActivity
     val vm = viewModel<SettingsVm>()
-    val ruleSummary by subscriptionState.ruleSummaryFlow.collectAsStateWithLifecycle()
+    val ruleSummary by SubscriptionState.ruleSummaryFlow.collectAsStateWithLifecycle()
     val actionCount by actionCountFlow.collectAsStateWithLifecycle()
     val subsStatus = ruleSummary.statusText(actionCount)
     val trackServiceRunning by TrackService.isRunning.collectAsStateWithLifecycle()

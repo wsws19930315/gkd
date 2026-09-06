@@ -12,11 +12,11 @@ import li.gkd.app.MainViewModel
 import li.gkd.app.data.AppInfo
 import li.gkd.app.data.RawSubscription
 import li.gkd.app.data.settings.SettingsStore
-import li.gkd.app.store.blockMatchAppListFlow
-import li.gkd.app.store.storeFlow
+import li.gkd.app.store.AppStore.blockMatchAppListFlow
+import li.gkd.app.store.AppStore.storeFlow
 import li.gkd.app.util.AppGroupOption
 import li.gkd.app.util.AppSortOption
-import li.gkd.app.appInfoRepository
+import li.gkd.app.data.appinfo.AppInfoRepository
 import li.gkd.app.util.collator
 import li.gkd.db.ActionLog
 import li.gkd.db.Db
@@ -61,7 +61,7 @@ fun BaseViewModel.useAppFilter(
     val debounceSearchStrFlow = searchStrFlow.debounce(200)
         .stateInit(searchStrFlow.value)
     val resultFlow = combine(
-        appInfoRepository.visibleAppInfosFlow,
+        AppInfoRepository.visibleAppInfosFlow,
         storeFlow,
         appOrderListState,
         mainVm.appVisitOrderMapState,
@@ -85,7 +85,7 @@ fun BaseViewModel.useAppFilter(
     }.stateInit(
         buildAppFilterResult(
             inputs = AppFilterInputs(
-                visibleApps = appInfoRepository.visibleAppInfosFlow.value,
+                visibleApps = AppInfoRepository.visibleAppInfosFlow.value,
                 settings = storeFlow.value,
                 appOrderList = appOrderListState.value.value.orEmpty(),
                 appVisitOrderMap = mainVm.appVisitOrderMapState.value.value.orEmpty(),
@@ -172,7 +172,7 @@ fun BaseViewModel.useSubsAppFilter(
     appActionOrderMapState: StateFlow<Loadable<Map<String, Int>>>,
 ): Flow<List<RawSubscription.RawApp>> {
     val filterInputsFlow = combine(
-        appInfoRepository.appInfoMapFlow,
+        AppInfoRepository.appInfoMapFlow,
         storeFlow,
         appActionOrderMapState,
         mainVm.appVisitOrderMapState,

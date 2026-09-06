@@ -23,7 +23,7 @@ import li.gkd.app.ui.component.TowLineText
 import li.gkd.app.ui.component.useSubs
 import li.gkd.app.ui.component.useSubsGroup
 import li.gkd.app.ui.style.scaffoldPadding
-import li.gkd.app.subscriptionRepository
+import li.gkd.app.data.subscription.SubscriptionRepository
 import li.gkd.app.ui.share.launchUiAction
 import li.gkd.app.ui.share.launchUi
 import li.gkd.app.util.throttle
@@ -91,7 +91,7 @@ class RuleGroupState(
     private suspend fun deleteGroup(
         state: RuleGroupTarget,
     ) {
-        subscriptionRepository.update(state.subsId) { subscription ->
+        SubscriptionRepository.update(state.subsId) { subscription ->
             when (state) {
                 is RuleGroupTarget.Global -> subscription.edit {
                     if (removeGlobalGroups { it.key == state.groupKey }.isEmpty()) {

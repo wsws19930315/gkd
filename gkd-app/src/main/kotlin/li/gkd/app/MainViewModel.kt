@@ -17,6 +17,8 @@ import li.gkd.app.a11y.useA11yServiceEnabledFlow
 import li.gkd.app.a11y.useEnabledA11yServicesFlow
 import li.gkd.app.data.CrashData
 import li.gkd.app.data.RawSubscription
+import li.gkd.app.data.appinfo.AppInfoRepository
+import li.gkd.app.data.backup.BackupManager
 import li.gkd.app.data.trimCrashDataFiles
 import li.gkd.app.entry.EntryActivity
 import li.gkd.app.entry.OpenFileActivity
@@ -26,9 +28,9 @@ import li.gkd.app.priv.uiAutomationFlow
 import li.gkd.app.permission.PermissionRequests
 import li.gkd.app.permission.PermissionStates
 import li.gkd.app.service.A11yService
-import li.gkd.app.store.createTextFlow
-import li.gkd.app.store.storeFlow
-import li.gkd.app.store.settingsRepository
+import li.gkd.app.store.AppStore
+import li.gkd.app.store.FileStateStore
+import li.gkd.app.store.AppStore.storeFlow
 import li.gkd.app.feature.settings.AdvancedPageRoute
 import li.gkd.app.ui.CrashReportRoute
 import li.gkd.app.ui.PrivilegeServiceRoute
@@ -52,7 +54,6 @@ import li.gkd.app.util.LogUtils
 import li.gkd.app.util.ShortUrlSet
 import li.gkd.app.util.ThrottleTimer
 import li.gkd.app.util.UpdateStatus
-import li.gkd.app.appInfoRepository
 import li.gkd.app.util.FolderUtils
 import li.gkd.app.util.findOption
 import li.gkd.app.util.json
@@ -263,7 +264,7 @@ class MainViewModel : BaseViewModel() {
                 return@launchUi
             }
             toast("导入备份中...")
-            withContext(Dispatchers.IO) { backupManager.importData(uri) }
+            withContext(Dispatchers.IO) { BackupManager.importData(uri) }
             toast("导入成功")
         }
     }
@@ -272,7 +273,7 @@ class MainViewModel : BaseViewModel() {
         field: MutableStateFlow<Boolean> = if (tempTermsAccepted) {
             MutableStateFlow(true)
         } else {
-            createTextFlow(
+            FileStateStore.createTextFlow(
                 key = "terms_accepted",
                 decode = { it == "true" },
                 encode = {
@@ -295,7 +296,7 @@ class MainViewModel : BaseViewModel() {
     private var updateAutomatorModeJob: Job? = null
 
     private fun applyAutomatorMode(option: AutomatorModeOption) {
-        settingsRepository.updateSettings { it.copy(automatorMode = option.value, enableAutomator = false) }
+        AppStore.updateAutomatorMode(option.value)
         A11yService.instance?.shutdown()
         uiAutomationFlow.value?.shutdown()
     }
@@ -338,7 +339,7 @@ class MainViewModel : BaseViewModel() {
 
     init {
         // preload
-        appInfoRepository.appIconMapFlow.value
+        AppInfoRepository.appIconMapFlow.value
         scope.launchLogged(Dispatchers.IO) {
             // 每次进入删除缓存
             FolderUtils.clearCache()

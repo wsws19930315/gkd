@@ -45,13 +45,13 @@ import li.gkd.app.data.RpcError
 import li.gkd.db.SubsItem
 import li.gkd.app.data.selfAppInfo
 import li.gkd.app.notif.NotificationCatalog
-import li.gkd.app.store.storeFlow
+import li.gkd.app.store.AppStore.storeFlow
 import li.gkd.db.LOCAL_HTTP_SUBS_ID
 import li.gkd.app.util.LogUtils
 import li.gkd.app.util.SERVER_SCRIPT_URL
 import li.gkd.app.snapshot.SnapshotCapture
-import li.gkd.app.snapshotRepository
-import li.gkd.app.subscriptionRepository
+import li.gkd.app.data.snapshot.SnapshotRepository
+import li.gkd.app.data.subscription.SubscriptionRepository
 import li.gkd.app.util.NetworkUtils
 import li.gkd.app.util.keepNullJson
 import li.gkd.app.util.launchLogged
@@ -74,7 +74,7 @@ class HttpService : LifecycleHookService() {
         onDestroyed {
             if (storeFlow.value.autoClearMemorySubs) {
                 appScope.launchLogged(Dispatchers.IO) {
-                    subscriptionRepository.delete(LOCAL_HTTP_SUBS_ID)
+                    SubscriptionRepository.delete(LOCAL_HTTP_SUBS_ID)
                 }
             }
         }
@@ -156,7 +156,7 @@ fun clearHttpSubs() {
     appScope.launchLogged {
         delay(1000)
         if (storeFlow.value.autoClearMemorySubs) {
-            subscriptionRepository.delete(LOCAL_HTTP_SUBS_ID)
+            SubscriptionRepository.delete(LOCAL_HTTP_SUBS_ID)
         }
     }
 }
@@ -177,7 +177,7 @@ private fun createServer(port: Int) = embeddedServer(CIO, port) {
             post("/getServerInfo") { call.respond(ServerInfo()) }
             post("/getSnapshot") {
                 val data = call.receive<ReqId>()
-                val fp = snapshotRepository.snapshotFile(data.id)
+                val fp = SnapshotRepository.snapshotFile(data.id)
                 if (!fp.exists()) {
                     throw RpcError("对应快照不存在")
                 }
@@ -185,7 +185,7 @@ private fun createServer(port: Int) = embeddedServer(CIO, port) {
             }
             post("/getScreenshot") {
                 val data = call.receive<ReqId>()
-                val fp = snapshotRepository.screenshotFile(data.id)
+                val fp = SnapshotRepository.screenshotFile(data.id)
                 if (!fp.exists()) {
                     throw RpcError("对应截图不存在")
                 }
@@ -195,9 +195,9 @@ private fun createServer(port: Int) = embeddedServer(CIO, port) {
                 call.respond(SnapshotCapture.capture())
             }
             post("/getSnapshots") {
-                val list = snapshotRepository.snapshots().first().mapNotNull {
+                val list = SnapshotRepository.snapshots().first().mapNotNull {
                     try {
-                        snapshotRepository.getMinSnapshot(it.id)
+                        SnapshotRepository.getMinSnapshot(it.id)
                     } catch (_: Throwable) {
                         null
                     }
@@ -206,10 +206,10 @@ private fun createServer(port: Int) = embeddedServer(CIO, port) {
             }
             post("/deleteSnapshot") {
                 val data = call.receive<ReqId>()
-                val allSnapshots = snapshotRepository.snapshots().first()
+                val allSnapshots = SnapshotRepository.snapshots().first()
                 val snapshot = allSnapshots.find { it.id == data.id }
                 if (snapshot != null) {
-                    snapshotRepository.delete(snapshot)
+                    SnapshotRepository.delete(snapshot)
                     call.respond(RpcOk("快照删除成功"))
                 } else {
                     throw RpcError("快照不存在或已被删除")
@@ -224,7 +224,7 @@ private fun createServer(port: Int) = embeddedServer(CIO, port) {
                             version = 0,
                             author = "@gkd-kit/inspect"
                         )
-                subscriptionRepository.saveWithItem(subscription, httpSubsItem)
+                SubscriptionRepository.saveWithItem(subscription, httpSubsItem)
                 call.respond(RpcOk())
             }
             post("/execSelector") {

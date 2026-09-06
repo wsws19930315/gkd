@@ -102,12 +102,6 @@ object SubscriptionRepository {
         }
     }
 
-    suspend fun awaitSubscription(id: Long): RawSubscription {
-        val snapshot = awaitSnapshot()
-        return snapshot.subscriptions[id]
-            ?: throw (snapshot.loadErrors[id] ?: IllegalStateException("订阅不存在: $id"))
-    }
-
     /**
      * Keeps backup file changes and compensation exclusive with subscription updates.
      * The block owns the database transaction and uses SubscriptionPersistence directly.
@@ -138,19 +132,6 @@ object SubscriptionRepository {
                     }.exceptionOrNull()?.let(error::addSuppressed)
                     throw error
                 }
-            }
-        }
-    }
-
-    suspend fun save(subscription: RawSubscription) = withContext(Dispatchers.IO) {
-        updateMutex.withStateLock {
-            try {
-                saveLocked(subscription)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                setUpdateError(subscription.id, e)
-                throw e
             }
         }
     }

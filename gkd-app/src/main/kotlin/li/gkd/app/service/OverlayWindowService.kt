@@ -45,7 +45,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import li.gkd.app.a11y.topActivityFlow
 import li.gkd.app.app
 import li.gkd.app.permission.PermissionStates
-import li.gkd.app.store.createAnyFlow
+import li.gkd.app.store.FileStateStore
 import li.gkd.app.ui.component.PerfIcon
 import li.gkd.app.ui.icon.DragPan
 import li.gkd.app.ui.style.AppTheme
@@ -83,7 +83,7 @@ private class ShareContext {
     var count = 0
     var overlayContentHidden by mutableStateOf(false)
     val scope = MainScope()
-    val positionMapFlow = createAnyFlow<Map<String, List<Int>>>(
+    val positionMapFlow = FileStateStore.createJsonFlow<Map<String, List<Int>>>(
         key = "overlay_position",
         default = { emptyMap() },
         scope = scope,

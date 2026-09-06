@@ -42,8 +42,8 @@ import li.gkd.app.R
 import li.gkd.app.core.state.Loadable
 import li.gkd.app.data.subscription.SubscriptionResult
 import li.gkd.app.feature.subscription.UpsertRuleGroupRoute
-import li.gkd.app.store.storeFlow
-import li.gkd.app.subscriptionState
+import li.gkd.app.store.AppStore.storeFlow
+import li.gkd.app.data.subscription.SubscriptionState
 import li.gkd.app.ui.SlowGroupRoute
 import li.gkd.app.ui.WebViewRoute
 import li.gkd.app.ui.component.AnimationFloatingActionButton
@@ -119,7 +119,7 @@ private fun useLoadedSubsManagePage(
     val settingsDialogVisible by vm.settingsDialogVisibleFlow.collectAsStateWithLifecycle()
     val powerWarningItem by vm.powerWarningItemFlow.collectAsStateWithLifecycle()
     val store by storeFlow.collectAsStateWithLifecycle()
-    val ruleSummary by subscriptionState.ruleSummaryFlow.collectAsStateWithLifecycle()
+    val ruleSummary by SubscriptionState.ruleSummaryFlow.collectAsStateWithLifecycle()
     val subItems = state.subItems
     val subsIdToRaw = state.subscriptions
     val scope = vm.scope

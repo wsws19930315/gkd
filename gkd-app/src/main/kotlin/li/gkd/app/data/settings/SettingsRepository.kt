@@ -4,18 +4,14 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import li.gkd.app.util.AppListString
 import li.gkd.app.util.LogUtils
 import li.gkd.app.util.json
@@ -35,7 +31,6 @@ private class PersistedValue<T>(
     file: File,
     private val decode: (String?) -> T,
     private val encode: (T) -> String,
-    private val onWriteResult: (Throwable?) -> Unit,
     scope: CoroutineScope,
 ) {
     private data class WriteRequest<T>(
@@ -84,7 +79,6 @@ private class PersistedValue<T>(
                     tempFile.delete()
                 }
                 writeResult.value = result
-                runCatching { onWriteResult(result.error) }
                 result.error?.let { error ->
                     runCatching { LogUtils.d("设置写入失败: $filename", error) }
                 }
@@ -129,14 +123,13 @@ private class PersistedValue<T>(
     }
 
     @Synchronized
-    fun update(transform: (T) -> T): T {
+    fun update(transform: (T) -> T) {
         val value = transform(mutableState.value)
         // Keep later commands on both outcomes, without holding a lock across disk I/O.
         // Like MutableStateFlow.update, transforms must be pure and may run more than once.
         rollbackState?.let { it.value = transform(it.value) }
         mutableState.value = value
         enqueue(value)
-        return value
     }
 
     suspend fun awaitPersistence() {
@@ -160,19 +153,6 @@ class SettingsRepository(
 ) {
     private val restoreMutex = Mutex()
 
-    val persistenceFailures: StateFlow<Map<String, Throwable>>
-        field = MutableStateFlow(emptyMap())
-
-    private fun persistedValueWriteResult(filename: String, error: Throwable?) {
-        persistenceFailures.update { failures ->
-            if (error == null) {
-                failures - filename
-            } else {
-                failures + (filename to error)
-            }
-        }
-    }
-
     private val settingsValue = PersistedValue(
         filename = "store.json",
         file = storeFolder.resolve("store.json"),
@@ -181,7 +161,6 @@ class SettingsRepository(
                 ?: defaultSettings()
         },
         encode = { json.encodeToString(it) },
-        onWriteResult = { persistedValueWriteResult("store.json", it) },
         scope = scope,
     )
     private val actionCountValue = PersistedValue(
@@ -189,7 +168,6 @@ class SettingsRepository(
         file = storeFolder.resolve("action_count.txt"),
         decode = { it?.toLongOrNull() ?: 0L },
         encode = { it.toString() },
-        onWriteResult = { persistedValueWriteResult("action_count.txt", it) },
         scope = scope,
     )
     private val blockMatchAppListValue = PersistedValue(
@@ -197,7 +175,6 @@ class SettingsRepository(
         file = storeFolder.resolve("block_match_app_list.txt"),
         decode = { it?.let(AppListString::decode) ?: defaultBlockMatchAppList() },
         encode = AppListString::encode,
-        onWriteResult = { persistedValueWriteResult("block_match_app_list.txt", it) },
         scope = scope,
     )
     private val blockA11yAppListValue = PersistedValue(
@@ -205,7 +182,6 @@ class SettingsRepository(
         file = storeFolder.resolve("block_a11y_app_list.txt"),
         decode = { it?.let(AppListString::decode) ?: emptySet() },
         encode = AppListString::encode,
-        onWriteResult = { persistedValueWriteResult("block_a11y_app_list.txt", it) },
         scope = scope,
     )
     private val a11yScopeAppListValue = PersistedValue(
@@ -213,7 +189,6 @@ class SettingsRepository(
         file = storeFolder.resolve("a11y_scope_app_list.txt"),
         decode = { it?.let(AppListString::decode) ?: setOf("com.tencent.mm") },
         encode = AppListString::encode,
-        onWriteResult = { persistedValueWriteResult("a11y_scope_app_list.txt", it) },
         scope = scope,
     )
 
@@ -232,25 +207,25 @@ class SettingsRepository(
     )
 
     /**
-     * Updates memory and enqueues persistence; use [awaitPersistence] to wait for disk.
+     * Updates memory and enqueues persistence.
      * The transform must be pure: a concurrent backup restore may evaluate it twice.
      */
-    fun updateSettings(transform: (SettingsStore) -> SettingsStore): SettingsStore =
+    fun updateSettings(transform: (SettingsStore) -> SettingsStore) =
         settingsValue.update(transform)
 
-    fun incrementActionCount(): Long = actionCountValue.update { it + 1 }
+    fun incrementActionCount() = actionCountValue.update { it + 1 }
 
-    fun updateBlockMatchAppList(transform: (Set<String>) -> Set<String>): Set<String> =
+    fun updateBlockMatchAppList(transform: (Set<String>) -> Set<String>) =
         blockMatchAppListValue.update(transform)
 
     fun replaceBlockMatchAppList(value: Set<String>) = blockMatchAppListValue.replace(value)
 
-    fun updateBlockA11yAppList(transform: (Set<String>) -> Set<String>): Set<String> =
+    fun updateBlockA11yAppList(transform: (Set<String>) -> Set<String>) =
         blockA11yAppListValue.update(transform)
 
     fun replaceBlockA11yAppList(value: Set<String>) = blockA11yAppListValue.replace(value)
 
-    fun updateA11yScopeAppList(transform: (Set<String>) -> Set<String>): Set<String> =
+    fun updateA11yScopeAppList(transform: (Set<String>) -> Set<String>) =
         a11yScopeAppListValue.update(transform)
 
     fun replaceA11yScopeAppList(value: Set<String>) = a11yScopeAppListValue.replace(value)
@@ -294,14 +269,4 @@ class SettingsRepository(
             }
         }
 
-    suspend fun awaitPersistence() = coroutineScope {
-        listOf(
-            settingsValue,
-            actionCountValue,
-            blockMatchAppListValue,
-            blockA11yAppListValue,
-            a11yScopeAppListValue,
-        ).map { value -> async { value.awaitPersistence() } }.awaitAll()
-        Unit
-    }
 }

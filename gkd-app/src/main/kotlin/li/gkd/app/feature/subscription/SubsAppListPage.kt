@@ -26,7 +26,7 @@ import androidx.navigation3.runtime.NavKey
 import kotlinx.serialization.Serializable
 import li.gkd.app.MainActivity
 import li.gkd.app.R
-import li.gkd.app.store.storeFlow
+import li.gkd.app.store.AppStore.storeFlow
 import li.gkd.app.ui.component.AnimatedIconButton
 import li.gkd.app.ui.component.AppBarTextField
 import li.gkd.app.ui.component.EmptyText
@@ -49,7 +49,7 @@ import li.gkd.app.ui.style.EmptyHeight
 import li.gkd.app.ui.style.scaffoldPadding
 import li.gkd.app.util.AppGroupOption
 import li.gkd.app.util.AppSortOption
-import li.gkd.app.appInfoRepository
+import li.gkd.app.data.appinfo.AppInfoRepository
 import li.gkd.app.util.findOption
 import li.gkd.app.ui.share.launchUi
 import li.gkd.app.util.throttle
@@ -71,7 +71,7 @@ fun SubsAppListPage(route: SubsAppListRoute) {
     val loadableState by vm.uiState.collectAsStateWithLifecycle()
     val appConfigMapState by vm.appConfigMapState.collectAsStateWithLifecycle()
     val enableSizeMapState by vm.enableSizeMapState.collectAsStateWithLifecycle()
-    val appInfoMap by appInfoRepository.appInfoMapFlow.collectAsStateWithLifecycle()
+    val appInfoMap by AppInfoRepository.appInfoMapFlow.collectAsStateWithLifecycle()
     val store by storeFlow.collectAsStateWithLifecycle()
     val state = loadableState.value
     val firstLoading = loadableState is Loadable.Loading

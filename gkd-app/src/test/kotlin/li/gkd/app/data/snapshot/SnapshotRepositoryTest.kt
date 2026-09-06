@@ -18,7 +18,7 @@ class SnapshotRepositoryTest {
         val directory = root.resolve(snapshot.id.toString()).apply { mkdirs() }
         directory.resolve("data").writeText("value")
         try {
-            val repository = SnapshotRepository(FakeSnapshotDao(deleteFailure = IOException("db")), root)
+            val repository = SnapshotStore(FakeSnapshotDao(deleteFailure = IOException("db")), root)
 
             val result = runCatching { repository.delete(snapshot) }
 
@@ -36,7 +36,7 @@ class SnapshotRepositoryTest {
         val directory = root.resolve(snapshot.id.toString()).apply { mkdirs() }
         directory.resolve("data").writeText("value")
         try {
-            val repository = SnapshotRepository(FakeSnapshotDao(), root)
+            val repository = SnapshotStore(FakeSnapshotDao(), root)
 
             repository.delete(snapshot)
 

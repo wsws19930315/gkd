@@ -28,23 +28,6 @@ object SubscriptionState {
                 SubscriptionRepository.snapshotFlow.value.value?.subscriptions.orEmpty(),
             )
     }
-    val subsLoadErrorsFlow by lazy {
-        SubscriptionRepository.snapshotFlow.map { it.value?.loadErrors.orEmpty() }
-            .stateIn(
-                appScope,
-                SharingStarted.Eagerly,
-                SubscriptionRepository.snapshotFlow.value.value?.loadErrors.orEmpty(),
-            )
-    }
-    val subsRefreshErrorsFlow by lazy {
-        SubscriptionRepository.snapshotFlow.map { it.value?.updateErrors.orEmpty() }
-            .stateIn(
-                appScope,
-                SharingStarted.Eagerly,
-                SubscriptionRepository.snapshotFlow.value.value?.updateErrors.orEmpty(),
-            )
-    }
-
     val latestRecordFlow by lazy {
         Db.actionLogDao.queryLatest()
             .stateIn(appScope, SharingStarted.Eagerly, null)
@@ -80,42 +63,13 @@ object SubscriptionState {
         }.stateIn(appScope, SharingStarted.Eagerly, null)
     }
 
-    fun buildSubsEntries(
+    fun buildUsedSubsEntries(
         items: List<SubsItem>,
         subscriptions: Map<Long, RawSubscription>,
-    ): List<SubsEntry> = items.map { item ->
-        SubsEntry(
-            subsItem = item,
-            subscription = subscriptions[item.id],
-        )
-    }
-
-    fun buildUsedSubsEntries(entries: List<SubsEntry>): List<UsedSubsEntry> =
-        entries.mapNotNull { entry ->
-            entry.subscription?.takeIf { entry.subsItem.enable && it.hasRule }?.let { subscription ->
-                UsedSubsEntry(entry.subsItem, subscription)
-            }
+    ): List<UsedSubsEntry> = items.mapNotNull { item ->
+        subscriptions[item.id]?.takeIf { item.enable && it.hasRule }?.let { subscription ->
+            UsedSubsEntry(item, subscription)
         }
-
-    val subsEntriesFlow by lazy {
-        combine(
-            subsItemsFlow,
-            subsMapFlow,
-        ) { subsItems, subsIdToRaw ->
-            buildSubsEntries(subsItems, subsIdToRaw)
-        }.stateIn(
-            appScope,
-            SharingStarted.Eagerly,
-            buildSubsEntries(subsItemsFlow.value, subsMapFlow.value),
-        )
-    }
-
-    val usedSubsEntriesFlow by lazy {
-        subsEntriesFlow.map(::buildUsedSubsEntries).stateIn(
-            appScope,
-            SharingStarted.Eagerly,
-            buildUsedSubsEntries(subsEntriesFlow.value),
-        )
     }
 
     val ruleSummaryFlow by lazy {
@@ -125,7 +79,7 @@ object SubscriptionState {
             Db.subscriptionConfigStore.observe(),
         ) { subscriptions, appInfoCache, configs ->
             RuleSummaryBuilder.build(
-                subscriptions = buildUsedSubsEntries(buildSubsEntries(configs.subsItems, subscriptions)),
+                subscriptions = buildUsedSubsEntries(configs.subsItems, subscriptions),
                 appInfoById = appInfoCache,
                 appConfigs = configs.appConfigs,
                 groupConfigs = configs.appGroupConfigs + configs.globalGroupConfigs,

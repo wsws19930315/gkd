@@ -35,7 +35,7 @@ import li.gkd.app.R
 import li.gkd.app.app
 import li.gkd.app.permission.PermissionStates
 import li.gkd.app.service.ScreenshotService
-import li.gkd.app.store.storeFlow
+import li.gkd.app.store.AppStore.storeFlow
 import li.gkd.app.ui.component.AppAlertDialog
 import li.gkd.app.ui.component.CustomOutlinedTextField
 import li.gkd.app.ui.component.PerfCustomIconButton

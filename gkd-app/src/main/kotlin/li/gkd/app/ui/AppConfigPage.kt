@@ -40,7 +40,7 @@ import li.gkd.app.domain.rule.toRuleGroupTarget
 import li.gkd.app.feature.log.ActionLogRoute
 import li.gkd.app.feature.subscription.SubsAppGroupListRoute
 import li.gkd.app.feature.subscription.UpsertRuleGroupRoute
-import li.gkd.app.store.storeFlow
+import li.gkd.app.store.AppStore.storeFlow
 import li.gkd.app.ui.component.AnimationFloatingActionButton
 import li.gkd.app.ui.component.AppNameText
 import li.gkd.app.ui.component.BatchActionMenuItem

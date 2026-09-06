@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import li.gkd.app.META
 import li.gkd.app.app
-import li.gkd.app.appInfoRepository
+import li.gkd.app.data.appinfo.AppInfoRepository
 import li.gkd.app.data.AppInfo
 import li.gkd.app.data.UserInfo
 import li.gkd.app.permission.PermissionStates
@@ -80,9 +80,9 @@ object FolderUtils {
     @Serializable
     private data class AppJsonData(
         val userId: Int = currentUserId,
-        val apps: List<AppInfo> = appInfoRepository.userAppInfoMapFlow.value.values.toList(),
-        val otherUsers: List<UserInfo> = appInfoRepository.otherUserMapFlow.value.values.toList(),
-        val othersApps: List<AppInfo> = appInfoRepository.otherUserAppInfoMapFlow.value.values.toList(),
+        val apps: List<AppInfo> = AppInfoRepository.userAppInfoMapFlow.value.values.toList(),
+        val otherUsers: List<UserInfo> = AppInfoRepository.otherUserMapFlow.value.values.toList(),
+        val othersApps: List<AppInfo> = AppInfoRepository.otherUserAppInfoMapFlow.value.values.toList(),
     )
 
     @WorkerThread
@@ -114,7 +114,7 @@ object FolderUtils {
                 it.appendText("未授权\n" + deniedPermissions.joinToString("\n") { state -> state.name })
                 it.appendText("\n\n")
             }
-            if (appInfoRepository.appListAuthAbnormalFlow.value) {
+            if (AppInfoRepository.appListAuthAbnormalFlow.value) {
                 it.appendText("其它\n")
                 it.appendText("读取应用列表权限异常")
             }

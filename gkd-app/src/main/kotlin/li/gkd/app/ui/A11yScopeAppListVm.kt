@@ -5,8 +5,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.map
 import li.gkd.app.MainViewModel
-import li.gkd.app.store.a11yScopeAppListFlow
-import li.gkd.app.store.settingsRepository
+import li.gkd.app.store.AppStore.a11yScopeAppListFlow
+import li.gkd.app.store.AppStore
 import li.gkd.app.ui.share.BaseViewModel
 import li.gkd.app.ui.share.useAppFilter
 import li.gkd.app.util.AppListString
@@ -39,11 +39,11 @@ class A11yScopeAppListVm(mainVm: MainViewModel) : BaseViewModel() {
     }.stateInit(AppListString.decode(textFlow.value).size)
 
     fun setSortType(value: AppSortOption) {
-        settingsRepository.updateSettings { it.copy(a11yScopeAppSort = value.value) }
+        AppStore.updateSettings { it.copy(a11yScopeAppSort = value.value) }
     }
 
     fun setAppGroupType(value: Int) {
-        settingsRepository.updateSettings { it.copy(a11yScopeAppGroupType = value) }
+        AppStore.updateSettings { it.copy(a11yScopeAppGroupType = value) }
     }
 
     fun setSearchStr(value: String) {
@@ -79,7 +79,7 @@ class A11yScopeAppListVm(mainVm: MainViewModel) : BaseViewModel() {
 
     fun saveText() {
         if (textChanged) {
-            settingsRepository.replaceA11yScopeAppList(AppListString.decode(textFlow.value))
+            AppStore.replaceA11yScopeAppList(AppListString.decode(textFlow.value))
             toast("更新成功")
         } else {
             toast("未修改")
@@ -88,6 +88,6 @@ class A11yScopeAppListVm(mainVm: MainViewModel) : BaseViewModel() {
     }
 
     fun toggleApp(appId: String) {
-        settingsRepository.updateA11yScopeAppList { it.switchItem(appId) }
+        AppStore.updateA11yScopeAppList { it.switchItem(appId) }
     }
 }

@@ -5,10 +5,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.withContext
 import li.gkd.app.data.screenshotFile
-import li.gkd.app.snapshotRepository
+import li.gkd.app.data.snapshot.SnapshotRepository
 import li.gkd.app.ui.share.BaseViewModel
 import li.gkd.app.util.ImageUtils
-import li.gkd.app.appInfoRepository
+import li.gkd.app.data.appinfo.AppInfoRepository
 import li.gkd.db.Snapshot
 import java.io.File
 
@@ -18,11 +18,11 @@ data class SnapshotUiState(
 )
 
 class SnapshotVm : BaseViewModel() {
-    private val snapshotsFlow = snapshotRepository.snapshots()
+    private val snapshotsFlow = SnapshotRepository.snapshots()
 
     val uiState = combine(
         snapshotsFlow,
-        appInfoRepository.appInfoMapFlow,
+        AppInfoRepository.appInfoMapFlow,
     ) { snapshots, appInfoMap ->
         SnapshotUiState(
             snapshots = snapshots,
@@ -30,25 +30,25 @@ class SnapshotVm : BaseViewModel() {
         )
     }.stateLoadable()
 
-    suspend fun deleteAllSnapshots() = snapshotRepository.deleteAll()
+    suspend fun deleteAllSnapshots() = SnapshotRepository.deleteAll()
 
-    suspend fun deleteSnapshot(snapshot: Snapshot) = snapshotRepository.delete(snapshot)
+    suspend fun deleteSnapshot(snapshot: Snapshot) = SnapshotRepository.delete(snapshot)
 
     suspend fun buildShareArchive(snapshot: Snapshot): File {
-        return snapshotRepository.createArchive(snapshot.id, snapshot.appId, snapshot.activityId)
+        return SnapshotRepository.createArchive(snapshot.id, snapshot.appId, snapshot.activityId)
     }
 
     suspend fun buildUploadArchive(snapshot: Snapshot): File =
-        snapshotRepository.createArchive(snapshot.id)
+        SnapshotRepository.createArchive(snapshot.id)
 
     suspend fun saveScreenshotToAlbum(snapshot: Snapshot) = withContext(Dispatchers.IO) {
         ImageUtils.save2Album(BitmapFactory.decodeFile(snapshot.screenshotFile.absolutePath))
     }
 
     suspend fun markUploaded(snapshot: Snapshot, githubAssetId: Int) =
-        snapshotRepository.markUploaded(snapshot, githubAssetId)
+        SnapshotRepository.markUploaded(snapshot, githubAssetId)
 
     suspend fun replaceScreenshot(snapshot: Snapshot, newBytes: ByteArray): Boolean {
-        return snapshotRepository.replaceScreenshot(snapshot, newBytes)
+        return SnapshotRepository.replaceScreenshot(snapshot, newBytes)
     }
 }

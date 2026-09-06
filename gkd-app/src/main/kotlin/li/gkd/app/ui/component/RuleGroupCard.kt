@@ -40,7 +40,7 @@ import li.gkd.app.a11y.launcherAppId
 import li.gkd.app.domain.rule.RuleGroupPolicy
 import li.gkd.app.ui.icon.ResetSettings
 import li.gkd.app.ui.share.noRippleClickable
-import li.gkd.app.appInfoRepository
+import li.gkd.app.data.appinfo.AppInfoRepository
 import li.gkd.app.util.throttle
 import java.util.Objects
 import li.gkd.db.SubsCategoryConfig
@@ -95,7 +95,7 @@ fun RuleGroupCard(
     val excludeData = remember(subsConfig?.exclude) {
         ExcludeData.parse(subsConfig?.exclude)
     }
-    val systemApps by appInfoRepository.systemAppsFlow.collectAsStateWithLifecycle()
+    val systemApps by AppInfoRepository.systemAppsFlow.collectAsStateWithLifecycle()
     val checked = if (inGlobalAppPage) {
         RuleGroupPolicy.getGlobalGroupChecked(
             subs,

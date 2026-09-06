@@ -37,7 +37,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import li.gkd.app.MainActivity
 import li.gkd.app.R
-import li.gkd.app.subscriptionState
+import li.gkd.app.data.subscription.SubscriptionState
 import li.gkd.app.permission.PermissionStates
 import li.gkd.app.priv.PrivilegeServiceStatus
 import li.gkd.app.priv.privilegeContextFlow
@@ -50,9 +50,9 @@ import li.gkd.app.platform.service.ServiceController
 import li.gkd.app.service.a11yPartDisabledFlow
 import li.gkd.app.service.switchAutomatorService
 import li.gkd.app.service.topAppIdFlow
-import li.gkd.app.store.actualA11yScopeAppList
-import li.gkd.app.store.actionCountFlow
-import li.gkd.app.store.storeFlow
+import li.gkd.app.store.AppStore.actualA11yScopeAppList
+import li.gkd.app.store.AppStore.actionCountFlow
+import li.gkd.app.store.AppStore.storeFlow
 import li.gkd.app.feature.log.ActionLogRoute
 import li.gkd.app.feature.log.ActivityLogRoute
 import li.gkd.app.ui.AppConfigRoute
@@ -82,7 +82,7 @@ fun useDashboardPage(): ScaffoldExt {
     val context = LocalActivity.current as MainActivity
     val mainVm = LocalMainViewModel.current
     val vm = viewModel<DashboardVm>()
-    val ruleSummary by subscriptionState.ruleSummaryFlow.collectAsStateWithLifecycle()
+    val ruleSummary by SubscriptionState.ruleSummaryFlow.collectAsStateWithLifecycle()
     val actionCount by actionCountFlow.collectAsStateWithLifecycle()
     val subsStatus = ruleSummary.statusText(actionCount)
     val store by storeFlow.collectAsStateWithLifecycle()
@@ -240,8 +240,8 @@ fun useDashboardPage(): ScaffoldExt {
                 },
             )
 
-            val latestRecord by subscriptionState.latestRecordFlow.collectAsStateWithLifecycle()
-            val latestRecordDesc by subscriptionState.latestRecordDescFlow.collectAsStateWithLifecycle()
+            val latestRecord by SubscriptionState.latestRecordFlow.collectAsStateWithLifecycle()
+            val latestRecordDesc by SubscriptionState.latestRecordDescFlow.collectAsStateWithLifecycle()
             TriggerOverviewCard(
                 subsStatus = subsStatus,
                 latestRecordDesc = latestRecordDesc,

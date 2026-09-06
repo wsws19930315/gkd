@@ -22,7 +22,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import li.gkd.app.data.GithubPoliciesAsset
-import li.gkd.app.store.createTextFlow
+import li.gkd.app.store.FileStateStore
 import li.gkd.app.util.GithubCookieException
 import li.gkd.app.util.LoadStatus
 import li.gkd.app.util.LogUtils
@@ -44,7 +44,7 @@ class GithubUploadState(
     private val onOpenCookieHelp: () -> Unit,
 ) {
     private val cookieFlow by lazy {
-        createTextFlow(
+        FileStateStore.createTextFlow(
             key = "github_cookie",
             decode = { it ?: "" },
             encode = { it },

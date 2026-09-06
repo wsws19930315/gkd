@@ -18,11 +18,11 @@ import li.gkd.app.platform.overlay.KeepAliveOverlayCoordinator
 import li.gkd.app.priv.PrivilegeServiceStatus
 import li.gkd.app.priv.privilegeServiceStatusFlow
 import li.gkd.app.priv.uiAutomationFlow
-import li.gkd.app.store.actionCountFlow
-import li.gkd.app.store.storeFlow
+import li.gkd.app.store.AppStore.actionCountFlow
+import li.gkd.app.store.AppStore.storeFlow
 import li.gkd.app.domain.rule.RuleSummary
-import li.gkd.app.appInfoRepository
-import li.gkd.app.subscriptionState
+import li.gkd.app.data.appinfo.AppInfoRepository
+import li.gkd.app.data.subscription.SubscriptionState
 import li.gkd.app.ui.share.statusText
 import li.gkd.app.util.IntentUtils
 import kotlin.time.Duration.Companion.milliseconds
@@ -34,7 +34,7 @@ class StatusService : LifecycleHookService() {
         val abRunning = A11yService.isRunning.value
         val automationRunning = uiAutomationFlow.value != null
         val store = storeFlow.value
-        val ruleSummary = subscriptionState.ruleSummaryFlow.value
+        val ruleSummary = SubscriptionState.ruleSummaryFlow.value
         val count = actionCountFlow.value
         val privilegeServiceStatus = privilegeServiceStatusFlow.value
         val title = if (store.useCustomNotifText) {
@@ -53,7 +53,7 @@ class StatusService : LifecycleHookService() {
                 } else if (PermissionStates.writeSecureSettings.updateAndGet()) {
                     if (store.enableAutomator && store.enableBlockA11yAppList && a11yPartDisabledFlow.value) {
                         val name =
-                            appInfoRepository.appInfoMapFlow.value[topAppIdFlow.value]?.name ?: topAppIdFlow.value
+                            AppInfoRepository.appInfoMapFlow.value[topAppIdFlow.value]?.name ?: topAppIdFlow.value
                         "局部关闭 · $name"
                     } else {
                         "无障碍已关闭"
@@ -66,7 +66,7 @@ class StatusService : LifecycleHookService() {
                 val text =
                     if (store.enableAutomator && store.enableBlockA11yAppList && a11yPartDisabledFlow.value) {
                         val name =
-                            appInfoRepository.appInfoMapFlow.value[topAppIdFlow.value]?.name ?: topAppIdFlow.value
+                            AppInfoRepository.appInfoMapFlow.value[topAppIdFlow.value]?.name ?: topAppIdFlow.value
                         "局部关闭 · $name"
                     } else {
                         "自动化已关闭"
@@ -122,7 +122,7 @@ class StatusService : LifecycleHookService() {
                     A11yService.isRunning,
                     uiAutomationFlow,
                     storeFlow,
-                    subscriptionState.ruleSummaryFlow,
+                    SubscriptionState.ruleSummaryFlow,
                     privilegeServiceStatusFlow,
                     a11yServiceEnabledFlow,
                     PermissionStates.writeSecureSettings.stateFlow,

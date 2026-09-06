@@ -12,7 +12,7 @@ import li.gkd.app.domain.rule.toRuleGroupTarget
 import li.gkd.app.util.MutexState
 import li.gkd.app.ui.share.BaseViewModel
 import li.gkd.app.core.state.Loadable
-import li.gkd.app.appInfoRepository
+import li.gkd.app.data.appinfo.AppInfoRepository
 import li.gkd.db.Db
 import li.gkd.db.SubsGlobalGroupConfig
 
@@ -79,7 +79,7 @@ class SubsGlobalGroupListVm(
             selectedGroups,
             enabled,
             launcherAppId,
-            appInfoRepository.systemAppsFlow.value,
+            AppInfoRepository.systemAppsFlow.value,
         ).size
     }
 

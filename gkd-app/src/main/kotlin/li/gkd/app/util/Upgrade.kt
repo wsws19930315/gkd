@@ -32,8 +32,8 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import li.gkd.app.META
 import li.gkd.app.app
-import li.gkd.app.store.createAnyFlow
-import li.gkd.app.store.storeFlow
+import li.gkd.app.store.FileStateStore
+import li.gkd.app.store.AppStore.storeFlow
 import li.gkd.app.ui.component.AppAlertDialog
 import li.songe.codeorigin.CallSite
 import java.io.File
@@ -48,7 +48,6 @@ private val UPDATE_URL: String
 data class NewVersion(
     val versionCode: Int,
     val versionName: String,
-    val changelog: String,
     val downloadUrl: String,
     val fileSize: Long,
     val versionLogs: List<VersionLog> = emptyList(),
@@ -72,7 +71,7 @@ class UpdateStatus(val scope: CoroutineScope) {
     private var downloadJob: Job? = null
 
     private val ignoreVersionListFlow by lazy {
-        createAnyFlow(
+        FileStateStore.createJsonFlow(
             key = "ignore_version_list",
             default = { emptySet<Int>() },
             scope = scope,

@@ -44,8 +44,8 @@ import kotlinx.coroutines.isActive
 import kotlinx.serialization.Serializable
 import li.gkd.app.META
 import li.gkd.app.R
-import li.gkd.app.store.storeFlow
-import li.gkd.app.store.settingsRepository
+import li.gkd.app.store.AppStore.storeFlow
+import li.gkd.app.store.AppStore
 import li.gkd.app.ui.component.PerfIcon
 import li.gkd.app.ui.component.PerfIconButton
 import li.gkd.app.ui.component.PerfTopAppBar
@@ -195,12 +195,12 @@ fun AboutPage() {
                                 title = "版本渠道",
                                 text = "测试版本渠道更新快\n但不稳定可能存在较多BUG\n请谨慎使用",
                             )) return@launchUi
-                            settingsRepository.updateSettings { settings ->
+                            AppStore.updateSettings { settings ->
                                 settings.copy(updateChannel = it.value)
                             }
                         }
                     } else {
-                        settingsRepository.updateSettings { settings ->
+                        AppStore.updateSettings { settings ->
                             settings.copy(updateChannel = it.value)
                         }
                     }

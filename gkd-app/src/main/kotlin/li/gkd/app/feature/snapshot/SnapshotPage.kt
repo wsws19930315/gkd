@@ -39,7 +39,7 @@ import li.gkd.app.MainActivity
 import li.gkd.app.data.date
 import li.gkd.app.data.screenshotFile
 import li.gkd.app.permission.PermissionStates
-import li.gkd.app.snapshotRepository
+import li.gkd.app.data.snapshot.SnapshotRepository
 import li.gkd.app.ui.component.EmptyText
 import li.gkd.app.ui.ImagePreviewRoute
 import li.gkd.app.ui.component.FixedTimeText
@@ -198,7 +198,7 @@ fun SnapshotPage() {
                                 try {
                                     context.saveFileToDownloads(archive)
                                 } finally {
-                                    snapshotRepository.deleteArchive(archive)
+                                    SnapshotRepository.deleteArchive(archive)
                                 }
                             }
                         })

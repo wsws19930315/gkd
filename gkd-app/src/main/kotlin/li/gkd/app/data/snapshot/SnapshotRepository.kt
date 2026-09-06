@@ -19,19 +19,25 @@ import li.gkd.app.snapshot.commitSnapshotDirectory
 import li.gkd.db.Snapshot
 import li.gkd.app.util.LogUtils
 import li.gkd.app.util.ZipUtils
-import li.gkd.app.appInfoRepository
+import li.gkd.app.data.appinfo.AppInfoRepository
 import li.gkd.app.util.FolderUtils
 import li.gkd.app.util.json
 import li.gkd.app.util.keepNullJson
 import li.gkd.app.util.webpLossyCompressFormat
+import li.gkd.db.Db
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.util.UUID
 
-class SnapshotRepository(
+object SnapshotRepository : SnapshotStore(
+    snapshotDao = Db.snapshotDao,
+    snapshotRoot = FolderUtils.snapshotFolder,
+)
+
+open class SnapshotStore(
     private val snapshotDao: Snapshot.SnapshotDao,
-    private val snapshotRoot: File,
+    snapshotRoot: File,
 ) {
     private val mutationMutex = Mutex()
     private val fileLayout = SnapshotFileLayout(snapshotRoot)
@@ -92,6 +98,7 @@ class SnapshotRepository(
     suspend fun deleteAll() = mutationMutex.withLock {
         currentCoroutineContext().ensureActive()
         withContext(NonCancellable + Dispatchers.IO) {
+            val snapshotRoot = fileLayout.rootDirectory
             val staged = stageDeletion(snapshotRoot)
             if (!snapshotRoot.mkdirs()) {
                 val error = IOException("无法重建快照目录")
@@ -170,7 +177,7 @@ class SnapshotRepository(
         mutationMutex.withLock {
             withContext(Dispatchers.IO) {
                 val filename = if (appId != null) {
-                    val appName = appInfoRepository.appInfoMapFlow.value[appId]?.name
+                    val appName = AppInfoRepository.appInfoMapFlow.value[appId]?.name
                         ?.filterNot { char -> char in "\\/:*?\"<>|" || char <= ' ' }
                     if (activityId != null) {
                         "${(appName ?: appId).take(20)}_${

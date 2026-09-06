@@ -22,8 +22,8 @@ import li.gkd.app.platform.lifecycle.MainActivityVisibility
 import li.gkd.app.service.EventService
 import li.gkd.app.service.topAppIdFlow
 import li.gkd.app.priv.privilegeContextFlow
-import li.gkd.app.store.actualBlockA11yAppList
-import li.gkd.app.store.storeFlow
+import li.gkd.app.store.AppStore.actualBlockA11yAppList
+import li.gkd.app.store.AppStore.storeFlow
 import li.gkd.app.util.AndroidTarget
 import li.gkd.app.util.launchLogged
 import li.gkd.app.util.ToastUtils.showActionToast

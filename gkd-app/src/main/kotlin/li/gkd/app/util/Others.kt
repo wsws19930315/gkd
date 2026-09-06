@@ -20,7 +20,7 @@ import androidx.compose.animation.togetherWith
 import kotlinx.serialization.json.JsonElement
 import li.gkd.app.META
 import li.gkd.app.app
-import li.gkd.app.appInfoRepository
+import li.gkd.app.data.appinfo.AppInfoRepository
 import li.songe.json5.Json5
 import li.songe.json5.Json5EncoderConfig
 import li.songe.json5.encodeToJson5String
@@ -134,9 +134,9 @@ object AppListString {
     fun encode(set: Set<String>, append: Boolean = false): String {
         val list = set.sorted()
         if (append) {
-            return list.sortedBy { id -> if (id in appInfoRepository.appInfoMapFlow.value) 0 else 1 }
+            return list.sortedBy { id -> if (id in AppInfoRepository.appInfoMapFlow.value) 0 else 1 }
                 .joinToString(separator = "\n\n", postfix = "\n\n") {
-                    val name = appInfoRepository.appInfoMapFlow.value[it]?.name
+                    val name = AppInfoRepository.appInfoMapFlow.value[it]?.name
                     if (name != null) {
                         "$it\n# $name"
                     } else {

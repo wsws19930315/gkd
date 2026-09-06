@@ -5,7 +5,7 @@ import li.gkd.app.service.ButtonService
 import li.gkd.app.service.EventService
 import li.gkd.app.service.HttpService
 import li.gkd.app.service.StatusService
-import li.gkd.app.store.settingsRepository
+import li.gkd.app.store.AppStore
 
 object ServiceController {
     fun setHttpEnabled(enabled: Boolean) = setEnabled(
@@ -38,7 +38,7 @@ object ServiceController {
             start = StatusService::start,
             stop = StatusService::stop,
         )
-        settingsRepository.updateSettings { it.copy(enableStatusService = enabled) }
+        AppStore.updateSettings { it.copy(enableStatusService = enabled) }
     }
 
     private fun setEnabled(

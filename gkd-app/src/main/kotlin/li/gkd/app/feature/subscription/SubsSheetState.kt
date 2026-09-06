@@ -35,7 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.MutableStateFlow
 import li.gkd.app.META
-import li.gkd.app.subscriptionRepository
+import li.gkd.app.data.subscription.SubscriptionRepository
 import li.gkd.app.data.mtimeStr
 import li.gkd.app.feature.log.ActionLogRoute
 import li.gkd.app.ui.component.AppModalBottomSheet
@@ -48,7 +48,7 @@ import li.gkd.db.LOCAL_SUBS_ID
 import li.gkd.app.data.subscription.SubscriptionResult
 import li.gkd.app.ui.share.launchUi
 import li.gkd.app.ui.share.message
-import li.gkd.app.subscriptionState
+import li.gkd.app.data.subscription.SubscriptionState
 import li.gkd.app.util.throttle
 import li.gkd.app.util.ToastUtils.toast
 
@@ -88,7 +88,7 @@ class SubsSheetState {
         requestedSubsId: Long?,
         onRenderedSubsIdChange: (Long?) -> Unit,
     ) {
-        val subsItems by subscriptionState.subsItemsFlow.collectAsStateWithLifecycle()
+        val subsItems by SubscriptionState.subsItemsFlow.collectAsStateWithLifecycle()
         val subsItem = subsItems.find { it.id == renderedSubsId }
         LaunchedEffect(requestedSubsId, subsItem) {
             if (requestedSubsId == null && subsItem == null) {
@@ -98,7 +98,7 @@ class SubsSheetState {
         if (subsItem != null) {
             val mainVm = LocalMainViewModel.current
             val scope = mainVm.scope
-            val subsIdToRaw by subscriptionState.subsMapFlow.collectAsStateWithLifecycle()
+            val subsIdToRaw by SubscriptionState.subsMapFlow.collectAsStateWithLifecycle()
             val scrollState = rememberScrollState()
             val sheetGesturesEnabled by remember {
                 derivedStateOf { scrollState.value == 0 }
@@ -316,7 +316,7 @@ class SubsSheetState {
                             Row(
                                 modifier = Modifier
                                     .clickable(onClickLabel = "编辑订阅链接", onClick = throttle {
-                                        if (subscriptionRepository.isBusy) {
+                                        if (SubscriptionRepository.isBusy) {
                                             toast("正在刷新订阅,请稍后操作")
                                             return@throttle
                                         }
@@ -325,7 +325,7 @@ class SubsSheetState {
                                                 initialValue = updateUrl,
                                             )
                                                     ?: return@launchUi
-                                            subscriptionRepository.addOrModifyRemote(url, subsItem).message?.let {
+                                            SubscriptionRepository.addOrModifyRemote(url, subsItem).message?.let {
                                                 toast(it)
                                             }
                                         }
@@ -360,7 +360,7 @@ class SubsSheetState {
                             }
                         }
                     } else {
-                        val loading by subscriptionRepository.updating.collectAsStateWithLifecycle()
+                        val loading by SubscriptionRepository.updating.collectAsStateWithLifecycle()
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -378,7 +378,7 @@ class SubsSheetState {
                                 )
                                 TextButton(onClick = throttle {
                                     scope.launchUi {
-                                        subscriptionRepository.refresh().message?.let { toast(it) }
+                                        SubscriptionRepository.refresh().message?.let { toast(it) }
                                     }
                                 }) {
                                     Text(text = "重新加载")
@@ -413,7 +413,7 @@ class SubsSheetState {
                                             text = "确定删除 ${subscription?.name ?: subsItem.id} ?",
                                             error = true,
                                         )) return@launchUi
-                                        val result = subscriptionRepository.delete(subsItem.id)
+                                        val result = SubscriptionRepository.delete(subsItem.id)
                                         result.message?.let {
                                             toast(it)
                                         }

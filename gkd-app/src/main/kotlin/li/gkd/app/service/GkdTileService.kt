@@ -21,9 +21,9 @@ import li.gkd.app.platform.lifecycle.MainActivityVisibility
 import li.gkd.app.priv.AutomationService
 import li.gkd.app.priv.privilegeContextFlow
 import li.gkd.app.priv.uiAutomationFlow
-import li.gkd.app.store.actualA11yScopeAppList
-import li.gkd.app.store.actualBlockA11yAppList
-import li.gkd.app.store.storeFlow
+import li.gkd.app.store.AppStore.actualA11yScopeAppList
+import li.gkd.app.store.AppStore.actualBlockA11yAppList
+import li.gkd.app.store.AppStore.storeFlow
 import li.gkd.app.ui.share.launchUi
 import li.gkd.app.util.mapState
 import li.gkd.app.util.runMainPost

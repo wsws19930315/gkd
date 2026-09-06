@@ -33,9 +33,9 @@ import li.gkd.app.ui.share.LocalMainViewModel
 import li.gkd.app.ui.style.EmptyHeight
 import li.gkd.app.ui.style.itemPadding
 import li.gkd.app.ui.style.scaffoldPadding
-import li.gkd.app.appInfoRepository
+import li.gkd.app.data.appinfo.AppInfoRepository
 import li.gkd.app.ui.share.launchUiAction
-import li.gkd.app.subscriptionState
+import li.gkd.app.data.subscription.SubscriptionState
 import li.gkd.app.util.throttle
 
 @Serializable
@@ -44,8 +44,8 @@ data object SlowGroupRoute : NavKey
 @Composable
 fun SlowGroupPage() {
     val mainVm = LocalMainViewModel.current
-    val ruleSummary by subscriptionState.ruleSummaryFlow.collectAsStateWithLifecycle()
-    val appInfoCache by appInfoRepository.appInfoMapFlow.collectAsStateWithLifecycle()
+    val ruleSummary by SubscriptionState.ruleSummaryFlow.collectAsStateWithLifecycle()
+    val appInfoCache by AppInfoRepository.appInfoMapFlow.collectAsStateWithLifecycle()
 
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     Scaffold(

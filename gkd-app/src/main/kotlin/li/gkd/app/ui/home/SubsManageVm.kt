@@ -11,14 +11,14 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import li.gkd.app.data.RawSubscription
 import li.gkd.db.SubsItem
-import li.gkd.app.store.storeFlow
-import li.gkd.app.store.settingsRepository
+import li.gkd.app.store.AppStore.storeFlow
+import li.gkd.app.store.AppStore
 import li.gkd.app.util.MutexState
 import li.gkd.app.ui.share.BaseViewModel
 import li.gkd.app.core.state.Loadable
 import li.gkd.app.data.subscription.SubscriptionResult
 import li.gkd.app.data.subscription.SubscriptionSnapshot
-import li.gkd.app.subscriptionRepository
+import li.gkd.app.data.subscription.SubscriptionRepository
 import li.gkd.app.ui.share.launchUi
 import li.gkd.app.ui.share.message
 import li.gkd.app.util.ToastUtils.toast
@@ -59,13 +59,13 @@ class SubsManageVm : BaseViewModel() {
         field = MutableStateFlow(null)
 
     val uiState: StateFlow<Loadable<SubsManageUiState>> =
-        subscriptionRepository.snapshotFlow.flatMapLatest { snapshotState ->
+        SubscriptionRepository.snapshotFlow.flatMapLatest { snapshotState ->
             when (snapshotState) {
                 Loadable.Loading -> flowOf(Loadable.Loading)
                 is Loadable.Failure -> flowOf(snapshotState)
                 is Loadable.Ready -> combine(
                     Db.subsItemDao.query(),
-                    subscriptionRepository.updating,
+                    SubscriptionRepository.updating,
                 ) { subItems, refreshing ->
                     buildSubsManageUiState(
                         subItems = subItems,
@@ -78,11 +78,11 @@ class SubsManageVm : BaseViewModel() {
         }.stateIn(scope, SharingStarted.Eagerly, Loadable.Loading)
 
     fun setUpdateInterval(value: Long) {
-        settingsRepository.updateSettings { it.copy(updateSubsInterval = value) }
+        AppStore.updateSettings { it.copy(updateSubsInterval = value) }
     }
 
     fun setPowerWarningEnabled(enabled: Boolean) {
-        settingsRepository.updateSettings { it.copy(subsPowerWarn = enabled) }
+        AppStore.updateSettings { it.copy(subsPowerWarn = enabled) }
     }
 
     fun setSettingsDialogVisible(visible: Boolean) {
@@ -90,17 +90,17 @@ class SubsManageVm : BaseViewModel() {
     }
 
     fun toggleMatching() {
-        settingsRepository.updateSettings { it.copy(enableMatch = !it.enableMatch) }
+        AppStore.updateSettings { it.copy(enableMatch = !it.enableMatch) }
     }
 
     fun refresh() {
         scope.launchUi {
-            subscriptionRepository.refresh().message?.let { toast(it) }
+            SubscriptionRepository.refresh().message?.let { toast(it) }
         }
     }
 
     suspend fun deleteSubscriptions(ids: Set<Long>): SubscriptionResult =
-        subscriptionRepository.delete(*(ids - LOCAL_SUBS_ID).toLongArray())
+        SubscriptionRepository.delete(*(ids - LOCAL_SUBS_ID).toLongArray())
 
     fun updateOrder(items: List<SubsItem>) {
         scope.launchUi {
@@ -147,5 +147,5 @@ class SubsManageVm : BaseViewModel() {
     suspend fun addOrModifySubscription(
         url: String,
         oldItem: SubsItem? = null,
-    ): SubscriptionResult = subscriptionRepository.addOrModifyRemote(url, oldItem)
+    ): SubscriptionResult = SubscriptionRepository.addOrModifyRemote(url, oldItem)
 }

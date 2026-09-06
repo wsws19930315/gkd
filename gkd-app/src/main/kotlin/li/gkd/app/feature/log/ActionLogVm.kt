@@ -16,8 +16,8 @@ import li.gkd.app.data.RawSubscription
 import li.gkd.app.domain.rule.RuleGroupPolicy
 import li.gkd.app.domain.rule.RuleGroupTarget
 import li.gkd.app.ui.share.BaseViewModel
-import li.gkd.app.subscriptionState
-import li.gkd.app.appInfoRepository
+import li.gkd.app.data.subscription.SubscriptionState
+import li.gkd.app.data.appinfo.AppInfoRepository
 import li.gkd.app.a11y.launcherAppId
 import li.gkd.db.ActionLog
 import li.gkd.db.Db
@@ -51,7 +51,7 @@ class ActionLogVm(
     }
         .flow
         .cachedIn(scope)
-        .combine(subscriptionState.subsMapFlow) { pagingData, subsMap ->
+        .combine(SubscriptionState.subsMapFlow) { pagingData, subsMap ->
             pagingData.map { actionLog ->
                 val subscription = subsMap[actionLog.subsId]
                 val group = if (actionLog.groupType == RuleGroupType.App) {
@@ -91,7 +91,7 @@ class ActionLogVm(
                     actionLog.groupKey,
                 )
             }
-            combine(configFlow, subscriptionState.subsMapFlow) { subsConfig, subsMap ->
+            combine(configFlow, SubscriptionState.subsMapFlow) { subsConfig, subsMap ->
                 val subscription = subsMap[actionLog.subsId]
                 val exclude = ExcludeData.parse(subsConfig?.exclude)
                 val globalAppChecked = if (actionLog.groupType == RuleGroupType.Global) {
@@ -104,7 +104,7 @@ class ActionLogVm(
                                 group,
                                 actionLog.appId,
                                 launcherAppId,
-                                appInfoRepository.systemAppsFlow.value,
+                                AppInfoRepository.systemAppsFlow.value,
                             )
                         }
                 } else {

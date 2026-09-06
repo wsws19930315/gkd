@@ -12,15 +12,15 @@ import li.gkd.db.SubsAppConfig
 import li.gkd.app.data.AppInfo
 import li.gkd.app.data.RawSubscription
 import li.gkd.app.domain.rule.RuleGroupPolicy
-import li.gkd.app.store.blockMatchAppListFlow
-import li.gkd.app.store.storeFlow
-import li.gkd.app.store.settingsRepository
+import li.gkd.app.store.AppStore.blockMatchAppListFlow
+import li.gkd.app.store.AppStore.storeFlow
+import li.gkd.app.store.AppStore
 import li.gkd.app.ui.share.BaseViewModel
 import li.gkd.app.ui.share.filterSubsApps
 import li.gkd.app.ui.share.subsAppActionOrderMapState
 import li.gkd.app.ui.share.useSubsAppFilter
 import li.gkd.app.util.AppSortOption
-import li.gkd.app.appInfoRepository
+import li.gkd.app.data.appinfo.AppInfoRepository
 import li.gkd.app.util.findOption
 import li.gkd.db.Db
 
@@ -91,7 +91,7 @@ class SubsAppListVm(
         )
         val filteredAppsFlow = combine(
             sortedAppsFlow,
-            appInfoRepository.appInfoMapFlow,
+            AppInfoRepository.appInfoMapFlow,
             debounceSearchStr,
         ) { list, appMap, searchStr ->
             buildUiState(rawSubscription, list, appMap, searchStr)
@@ -103,7 +103,7 @@ class SubsAppListVm(
         val settings = storeFlow.value
         val apps = filterSubsApps(
             apps = rawSubscription.apps,
-            appMap = appInfoRepository.appInfoMapFlow.value,
+            appMap = AppInfoRepository.appInfoMapFlow.value,
             settings = settings,
             appActionOrderMap = appActionOrderMapState.value.value.orEmpty(),
             appVisitOrderMap = mainVm.appVisitOrderMapState.value.value.orEmpty(),
@@ -115,7 +115,7 @@ class SubsAppListVm(
         return buildUiState(
             rawSubscription = rawSubscription,
             apps = apps,
-            appMap = appInfoRepository.appInfoMapFlow.value,
+            appMap = AppInfoRepository.appInfoMapFlow.value,
             searchStr = searchStrFlow.value,
         )
     }
@@ -170,15 +170,15 @@ class SubsAppListVm(
     }
 
     fun setSortType(value: AppSortOption) {
-        settingsRepository.updateSettings { it.copy(subsAppSort = value.value) }
+        AppStore.updateSettings { it.copy(subsAppSort = value.value) }
     }
 
     fun setAppGroupType(value: Int) {
-        settingsRepository.updateSettings { it.copy(subsAppGroupType = value) }
+        AppStore.updateSettings { it.copy(subsAppGroupType = value) }
     }
 
     fun toggleShowBlockApps() {
-        settingsRepository.updateSettings { it.copy(subsAppShowBlock = !it.subsAppShowBlock) }
+        AppStore.updateSettings { it.copy(subsAppShowBlock = !it.subsAppShowBlock) }
     }
 
     suspend fun setAppEnabled(appId: String, enabled: Boolean) {

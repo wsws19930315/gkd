@@ -23,8 +23,8 @@ import li.gkd.app.data.info2nodeList
 import li.gkd.app.notif.NotificationCatalog
 import li.gkd.app.priv.privilegeContextFlow
 import li.gkd.app.service.ScreenshotService
-import li.gkd.app.snapshotRepository
-import li.gkd.app.store.storeFlow
+import li.gkd.app.data.snapshot.SnapshotRepository
+import li.gkd.app.store.AppStore.storeFlow
 import li.gkd.app.util.AndroidTarget
 import li.gkd.app.util.AutomatorModeOption
 import li.gkd.app.util.BarUtils
@@ -266,7 +266,7 @@ object SnapshotCapture {
             }
 
             try {
-                snapshotRepository.save(snapshot, screenResult.bitmap)
+                SnapshotRepository.save(snapshot, screenResult.bitmap)
             } finally {
                 screenResult.bitmap.recycle()
             }
@@ -274,7 +274,7 @@ object SnapshotCapture {
                 storeFlow.value.autoSaveSnapshotToDownloads && SystemDownloads.canSave()
             ) {
                 try {
-                    val archive = snapshotRepository.createArchive(
+                    val archive = SnapshotRepository.createArchive(
                         snapshot.id,
                         snapshot.appId,
                         snapshot.activityId,
@@ -282,7 +282,7 @@ object SnapshotCapture {
                     try {
                         SystemDownloads.save(archive)
                     } finally {
-                        snapshotRepository.deleteArchive(archive)
+                        SnapshotRepository.deleteArchive(archive)
                     }
                 } catch (e: CancellationException) {
                     throw e

@@ -15,7 +15,7 @@ import li.gkd.app.util.MutexState
 import li.gkd.app.ui.share.BaseViewModel
 import li.gkd.app.core.state.Loadable
 import li.gkd.app.util.toJson5String
-import li.gkd.app.appInfoRepository
+import li.gkd.app.data.appinfo.AppInfoRepository
 import li.gkd.db.SubsAppGroupConfig
 import li.gkd.db.SubsCategoryConfig
 import li.gkd.db.Db
@@ -114,7 +114,7 @@ class SubsAppGroupListVm(
             selectedGroups,
             enabled,
             launcherAppId,
-            appInfoRepository.systemAppsFlow.value,
+            AppInfoRepository.systemAppsFlow.value,
         ).size
     }
 

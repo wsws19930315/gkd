@@ -24,7 +24,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import li.gkd.app.data.AppInfo
 import li.gkd.app.priv.currentUserId
-import li.gkd.app.appInfoRepository
+import li.gkd.app.data.appinfo.AppInfoRepository
 
 @Composable
 fun AppNameText(
@@ -35,14 +35,14 @@ fun AppNameText(
     style: TextStyle = LocalTextStyle.current,
     color: Color = Color.Unspecified,
 ) {
-    val info = appInfo ?: appInfoRepository.appInfoMapFlow.collectAsStateWithLifecycle().value[appId]
+    val info = appInfo ?: AppInfoRepository.appInfoMapFlow.collectAsStateWithLifecycle().value[appId]
     val showSystemIcon = info?.isSystem == true
     val appName = (info?.name ?: fallbackName ?: appId ?: error("appId is required"))
     val userName = info?.userId?.let { userId ->
         if (userId == currentUserId) {
             null
         } else {
-            val userInfo = appInfoRepository.otherUserMapFlow.collectAsStateWithLifecycle().value[userId]
+            val userInfo = AppInfoRepository.otherUserMapFlow.collectAsStateWithLifecycle().value[userId]
             "「${userInfo?.name ?: userId}」"
         }
     }

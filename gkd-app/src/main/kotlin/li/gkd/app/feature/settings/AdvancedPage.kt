@@ -47,7 +47,7 @@ import li.gkd.app.service.ActivityService
 import li.gkd.app.service.ButtonService
 import li.gkd.app.service.EventService
 import li.gkd.app.service.HttpService
-import li.gkd.app.store.storeFlow
+import li.gkd.app.store.AppStore.storeFlow
 import li.gkd.app.ui.component.AppAlertDialog
 import li.gkd.app.ui.component.PerfCustomIconButton
 import li.gkd.app.ui.component.PerfIcon

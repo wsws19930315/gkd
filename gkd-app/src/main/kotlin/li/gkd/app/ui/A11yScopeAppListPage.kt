@@ -27,8 +27,8 @@ import androidx.navigation3.runtime.NavKey
 import kotlinx.serialization.Serializable
 import li.gkd.app.MainActivity
 import li.gkd.app.R
-import li.gkd.app.store.a11yScopeAppListFlow
-import li.gkd.app.store.storeFlow
+import li.gkd.app.store.AppStore.a11yScopeAppListFlow
+import li.gkd.app.store.AppStore.storeFlow
 import li.gkd.app.ui.component.AnimatedBooleanContent
 import li.gkd.app.ui.component.AnimatedIconButton
 import li.gkd.app.ui.component.AnimationFloatingActionButton

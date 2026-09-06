@@ -1,9 +1,9 @@
 package li.gkd.app.feature.snapshot
 
-import li.gkd.app.store.storeFlow
-import li.gkd.app.store.settingsRepository
+import li.gkd.app.store.AppStore.storeFlow
+import li.gkd.app.store.AppStore
 import li.gkd.app.ui.share.BaseViewModel
-import li.gkd.app.appInfoRepository
+import li.gkd.app.data.appinfo.AppInfoRepository
 import li.gkd.app.util.ToastUtils.toast
 import li.gkd.selector.Selector
 import li.gkd.selector.SelectorCompileResult
@@ -20,7 +20,7 @@ class SnapshotSettingsVm : BaseViewModel() {
         ) {
             return true
         }
-        if (appId.isNotEmpty() && !appInfoRepository.appInfoMapFlow.value.contains(appId)) {
+        if (appId.isNotEmpty() && !AppInfoRepository.appInfoMapFlow.value.contains(appId)) {
             toast("无效应用ID")
             return false
         }
@@ -31,7 +31,7 @@ class SnapshotSettingsVm : BaseViewModel() {
             toast("无效事件选择器")
             return false
         }
-        settingsRepository.updateSettings {
+        AppStore.updateSettings {
             it.copy(
                 screenshotTargetAppId = appId,
                 screenshotEventSelector = eventSelector,
@@ -42,12 +42,12 @@ class SnapshotSettingsVm : BaseViewModel() {
     }
 
     fun setCaptureVolumeChange(enabled: Boolean) {
-        settingsRepository.updateSettings { it.copy(captureVolumeChange = enabled) }
+        AppStore.updateSettings { it.copy(captureVolumeChange = enabled) }
     }
 
     fun setCaptureScreenshot(enabled: Boolean) {
         val store = storeFlow.value
-        settingsRepository.updateSettings { it.copy(captureScreenshot = enabled) }
+        AppStore.updateSettings { it.copy(captureScreenshot = enabled) }
         if (
             enabled && (
                 store.screenshotTargetAppId.isEmpty() ||
@@ -59,10 +59,10 @@ class SnapshotSettingsVm : BaseViewModel() {
     }
 
     fun setHideSnapshotStatusBar(enabled: Boolean) {
-        settingsRepository.updateSettings { it.copy(hideSnapshotStatusBar = enabled) }
+        AppStore.updateSettings { it.copy(hideSnapshotStatusBar = enabled) }
     }
 
     fun setAutoSaveSnapshotToDownloads(enabled: Boolean) {
-        settingsRepository.updateSettings { it.copy(autoSaveSnapshotToDownloads = enabled) }
+        AppStore.updateSettings { it.copy(autoSaveSnapshotToDownloads = enabled) }
     }
 }

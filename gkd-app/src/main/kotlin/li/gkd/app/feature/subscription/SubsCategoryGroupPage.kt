@@ -54,7 +54,7 @@ import li.gkd.app.ui.share.noRippleClickable
 import li.gkd.app.ui.style.EmptyHeight
 import li.gkd.app.ui.style.iconTextSize
 import li.gkd.app.ui.style.scaffoldPadding
-import li.gkd.app.store.storeFlow
+import li.gkd.app.store.AppStore.storeFlow
 import li.gkd.app.util.AppGroupOption
 import li.gkd.app.util.AppSortOption
 import li.gkd.app.util.findOption

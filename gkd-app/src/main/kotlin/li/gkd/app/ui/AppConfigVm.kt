@@ -17,8 +17,8 @@ import kotlinx.coroutines.withContext
 import li.gkd.app.data.ruleconfig.RuleGroupConfigService
 import li.gkd.app.data.RawSubscription
 import li.gkd.app.data.subscription.UsedSubsEntry
-import li.gkd.app.store.storeFlow
-import li.gkd.app.store.settingsRepository
+import li.gkd.app.store.AppStore.storeFlow
+import li.gkd.app.store.AppStore
 import li.gkd.app.domain.rule.RuleGroupTarget
 import li.gkd.app.domain.rule.RuleGroupPolicy
 import li.gkd.app.a11y.launcherAppId
@@ -26,9 +26,9 @@ import li.gkd.app.util.MutexState
 import li.gkd.app.ui.share.BaseViewModel
 import li.gkd.app.core.state.Loadable
 import li.gkd.app.util.RuleSortOption
-import li.gkd.app.subscriptionRepository
-import li.gkd.app.appInfoRepository
-import li.gkd.app.subscriptionState
+import li.gkd.app.data.subscription.SubscriptionRepository
+import li.gkd.app.data.appinfo.AppInfoRepository
+import li.gkd.app.data.subscription.SubscriptionState
 import li.gkd.app.util.collator
 import li.gkd.app.util.findOption
 import li.gkd.app.util.toJson5String
@@ -77,14 +77,14 @@ class AppConfigVm(
     }
 
     fun setRuleSortType(option: RuleSortOption) {
-        settingsRepository.updateSettings { it.copy(appRuleSort = option.value) }
+        AppStore.updateSettings { it.copy(appRuleSort = option.value) }
     }
 
     fun toggleShowDisabledRule() {
-        settingsRepository.updateSettings { it.copy(showDisabledRule = !it.showDisabledRule) }
+        AppStore.updateSettings { it.copy(showDisabledRule = !it.showDisabledRule) }
     }
 
-    private val databaseStateFlow = subscriptionRepository.snapshotFlow.flatMapLatest { snapshotState ->
+    private val databaseStateFlow = SubscriptionRepository.snapshotFlow.flatMapLatest { snapshotState ->
         when (snapshotState) {
             Loadable.Loading -> flowOf(Loadable.Loading)
             is Loadable.Failure -> flowOf(snapshotState)
@@ -96,8 +96,9 @@ class AppConfigVm(
                 val appUsedSubsIds = usedSubsIds.filter { id ->
                     appConfigs.find { it.subsId == id }?.enable != false
                 }
-                val entries = subscriptionState.buildUsedSubsEntries(
-                    subscriptionState.buildSubsEntries(items, snapshotState.value.subscriptions)
+                val entries = SubscriptionState.buildUsedSubsEntries(
+                    items,
+                    snapshotState.value.subscriptions,
                 )
                 appUsedSubsIds to entries
             }.distinctUntilChanged().flatMapLatest { (usedSubsIds, entries) ->
@@ -148,7 +149,7 @@ class AppConfigVm(
                                     subsConfig = subsConfig,
                                     categoryConfig = categoryConfig,
                                     launcherAppId = launcherAppId,
-                                    systemAppIds = appInfoRepository.systemAppsFlow.value,
+                                    systemAppIds = AppInfoRepository.systemAppsFlow.value,
                                 ) && (
                                     group !is RawSubscription.RawGlobalGroup ||
                                         subsConfig?.enable != false
@@ -272,7 +273,7 @@ class AppConfigVm(
             selectedGroups,
             enabled,
             launcherAppId,
-            appInfoRepository.systemAppsFlow.value,
+            AppInfoRepository.systemAppsFlow.value,
         ).size
     }
 
@@ -291,7 +292,7 @@ class AppConfigVm(
             toJson5String(
                 RawSubscription.RawApp(
                     id = route.appId,
-                    name = appInfoRepository.appInfoMapFlow.value[route.appId]?.name,
+                    name = AppInfoRepository.appInfoMapFlow.value[route.appId]?.name,
                     groups = groups,
                 )
             )

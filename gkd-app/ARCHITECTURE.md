@@ -17,7 +17,7 @@ service / receiver ─► data、domain、platform
 
 ## 目录职责
 
-- `app/`：生产实例组装入口。进程级唯一组件直接声明为 `object`；`AppContainer` 只创建需要独立构造的 `SettingsRepository` 和 `SnapshotRepository`，不放业务逻辑，也不包装 DAO。
+- `app/`：应用进程与 Activity 生命周期入口。进程级唯一组件直接声明为 `object`，生产实例由各自业务包负责，不设置统一容器。
 - `core/`：跨层共享且不依赖 Android UI 的基础状态和值类型。
 - `feature/`：按用户功能组织 Page、Route、ViewModel 和功能内组件。当前包含 `log`、`snapshot`、`subscription`、`settings`。
 - `domain/`：可独立验证的业务规则与值对象，例如规则组启用策略。不得依赖 Compose、Activity、Service 或 DAO。
@@ -30,7 +30,7 @@ service / receiver ─► data、domain、platform
 
 | 场景 | 读取 | 写入 |
 | --- | --- | --- |
-| 设置 | `SettingsRepository` 暴露的只读 `StateFlow` | `SettingsRepository.update/replace` |
+| 设置 | `AppStore` 暴露的只读 `StateFlow` | `AppStore.update/replace`，并将自动化开关同步到特权进程生命周期配置 |
 | 订阅 | `SubscriptionRepository.snapshotFlow`、`SubscriptionState` 的派生状态、`Db.subsItemDao` 的冷 `Flow` | `SubscriptionRepository` 编排订阅用例，`SubscriptionPersistence` 保证文件与数据库补偿一致性，`SubscriptionFileStore` 负责原子文件写入，单表字段更新直接使用 DAO |
 | 规则配置 | Room DAO 的冷 `Flow` | 单表写入使用 DAO；跨规则业务操作使用 `RuleGroupConfigService` |
 | 日志 | 对应 Room DAO 的 Flow/PagingSource | 对应 Room DAO 的插入、删除、裁剪方法 |
@@ -56,7 +56,7 @@ Composable 不得直接访问 `Db`、文件或 Service 生命周期。ViewModel 
 2. 跨页面业务判断进入 `domain`，并优先写纯函数行为测试。
 3. 单表查询或写入直接使用对应 DAO，不新增一对一转发层；网络、文件、缓存、并发控制和跨表一致性操作进入 `data/<name>` 下职责明确的 Repository、Manager 或 Service。
 4. Android 权限、Service、通知及系统 API 适配进入 `platform` 或保留在已注册组件包中，通过窄接口向上提供能力。
-5. 进程级唯一且依赖固定的组件直接声明为 `object`；只有确实需要独立构造的生产实例才由 `AppContainer` 创建。DAO 直接由 `Db` 提供，不在容器中重复暴露。
+5. 进程级唯一且依赖固定的组件直接声明为 `object`；需要独立构造的可测实现保留在自己的业务包中。DAO 直接由 `Db` 提供，不通过容器重复暴露。
 
 ## 迁移中的兼容边界
 

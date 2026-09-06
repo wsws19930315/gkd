@@ -39,8 +39,8 @@ import li.gkd.app.R
 import li.gkd.app.a11y.launcherAppId
 import li.gkd.app.data.ExcludeData
 import li.gkd.app.domain.rule.RuleGroupPolicy
-import li.gkd.app.store.blockMatchAppListFlow
-import li.gkd.app.store.storeFlow
+import li.gkd.app.store.AppStore.blockMatchAppListFlow
+import li.gkd.app.store.AppStore.storeFlow
 import li.gkd.app.ui.component.AnimatedBooleanContent
 import li.gkd.app.ui.component.AnimatedIconButton
 import li.gkd.app.ui.component.AnimationFloatingActionButton
@@ -75,7 +75,7 @@ import li.gkd.app.util.AppGroupOption
 import li.gkd.app.util.AppSortOption
 import li.gkd.app.util.findOption
 import li.gkd.app.ui.share.launchUi
-import li.gkd.app.appInfoRepository
+import li.gkd.app.data.appinfo.AppInfoRepository
 import li.gkd.app.util.throttle
 import li.gkd.app.util.ToastUtils.toast
 
@@ -105,7 +105,7 @@ fun SubsGlobalGroupExcludePage(route: SubsGlobalGroupExcludeRoute) {
         val showAllApps = state.showAllApps
         val blockMatchAppList by blockMatchAppListFlow.collectAsStateWithLifecycle()
         val showSearchBar by vm.showSearchBarFlow.collectAsStateWithLifecycle()
-        val systemApps by appInfoRepository.systemAppsFlow.collectAsStateWithLifecycle()
+        val systemApps by AppInfoRepository.systemAppsFlow.collectAsStateWithLifecycle()
         LaunchedEffect(key1 = showSearchBar, block = {
             if (!showSearchBar) {
                 vm.setSearchText("")
