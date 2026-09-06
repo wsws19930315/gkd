@@ -6,7 +6,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import kotlinx.atomicfu.atomic
 import li.gkd.app.META
-import li.gkd.app.a11y.topActivityFlow
+import li.gkd.app.a11y.currentTopActivity
 import li.gkd.app.a11y.updateTopActivity
 import li.gkd.app.util.LogUtils
 import li.songe.codeorigin.CallSite
@@ -31,13 +31,11 @@ private class MainActivityLifecycleObserver(
     override fun onStart(owner: LifecycleOwner) {
         LogUtils.d("MainActivity::onStart", loc = logLoc)
         visibleActivityCount.incrementAndGet()
-        if (topActivityFlow.value.appId != META.appId) {
-            synchronized(topActivityFlow) {
-                updateTopActivity(
-                    META.appId,
-                    activity::class.jvmName,
-                )
-            }
+        if (currentTopActivity.appId != META.appId) {
+            updateTopActivity(
+                META.appId,
+                activity::class.jvmName,
+            )
         }
     }
 

@@ -16,6 +16,33 @@ data class SubscriptionConfigSnapshot(
 )
 
 class SubscriptionConfigStore(private val database: AppDb) {
+    suspend fun updateAppGroupConfig(
+        subsId: Long,
+        appId: String,
+        groupKey: Int,
+        transform: (SubsAppGroupConfig) -> SubsAppGroupConfig,
+    ): SubsAppGroupConfig = database.withWriteTransaction {
+        val dao = database.subsAppGroupConfigDao()
+        val current = dao.getConfig(subsId, appId, groupKey)
+        val next = transform(current ?: SubsAppGroupConfig(subsId, appId, groupKey))
+        require(next.subsId == subsId && next.appId == appId && next.groupKey == groupKey)
+        if (next != current) dao.upsert(next)
+        next
+    }
+
+    suspend fun updateGlobalGroupConfig(
+        subsId: Long,
+        groupKey: Int,
+        transform: (SubsGlobalGroupConfig) -> SubsGlobalGroupConfig,
+    ): SubsGlobalGroupConfig = database.withWriteTransaction {
+        val dao = database.subsGlobalGroupConfigDao()
+        val current = dao.getConfig(subsId, groupKey)
+        val next = transform(current ?: SubsGlobalGroupConfig(subsId, groupKey))
+        require(next.subsId == subsId && next.groupKey == groupKey)
+        if (next != current) dao.upsert(next)
+        next
+    }
+
     fun observe(): Flow<SubscriptionConfigSnapshot> = database.invalidationTracker.createFlow(
         "subs_item", "subs_app_config", "subs_category_config", "subs_app_group_config", "subs_global_group_config",
     ).map { capture() }.distinctUntilChanged()

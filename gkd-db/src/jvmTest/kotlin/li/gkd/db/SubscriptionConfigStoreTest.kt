@@ -4,6 +4,9 @@ import androidx.room3.Room
 import androidx.room3.withWriteTransaction
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
@@ -123,4 +126,66 @@ class SubscriptionConfigStoreTest {
         }
         assertEquals(before, store.capture())
     }
+    @Test
+    fun concurrentGlobalGroupUpdatesPreserveEveryChangeToTheSameColumn() = withDatabase { db, store ->
+        db.subsItemDao().upsert(SubsItem(7, order = 0))
+        coroutineScope {
+            List(40) { index ->
+                async(Dispatchers.Default) {
+                    store.updateGlobalGroupConfig(7, 4) { current ->
+                        current.copy(exclude = current.exclude + "$index\n")
+                    }
+                }
+            }.awaitAll()
+        }
+        val actual = db.subsGlobalGroupConfigDao().getConfig(7, 4)!!.exclude
+            .lineSequence().filter { it.isNotEmpty() }.map { it.toInt() }.toSet()
+        assertEquals((0 until 40).toSet(), actual)
+    }
+
+    @Test
+    fun changingAnAppGroupSwitchKeepsTheLatestExclusionAndFailedEditsLeaveItUntouched() =
+        withDatabase { db, store ->
+            db.subsItemDao().upsert(SubsItem(7, order = 0))
+            store.updateAppGroupConfig(7, "app.one", 4) { it.copy(exclude = "new.Activity") }
+            store.updateAppGroupConfig(7, "app.one", 4) { it.copy(enable = false) }
+            val expected = SubsAppGroupConfig(7, "app.one", 4, false, "new.Activity")
+            assertEquals(expected, db.subsAppGroupConfigDao().getConfig(7, "app.one", 4))
+
+            assertFailsWith<IllegalStateException> {
+                store.updateAppGroupConfig(7, "app.one", 4) { current ->
+                    check(current.exclude == "old.Activity") { "stale editor" }
+                    current.copy(exclude = "edited.Activity")
+                }
+            }
+            assertEquals(expected, db.subsAppGroupConfigDao().getConfig(7, "app.one", 4))
+        }
+
+    @Test
+    fun failedImportDoesNotRollBackANormalWriteWaitingForTheTransaction() = withDatabase { db, store ->
+        store.merge(sample())
+        coroutineScope {
+            val importing = CompletableDeferred<Unit>()
+            val normalWriteStarted = CompletableDeferred<Unit>()
+            val normalWrite = async(Dispatchers.Default) {
+                importing.await()
+                normalWriteStarted.complete(Unit)
+                db.subsItemDao().updateEnable(7, false)
+            }
+            assertFailsWith<IllegalStateException> {
+                db.withWriteTransaction {
+                    store.merge(sample(8))
+                    importing.complete(Unit)
+                    normalWriteStarted.await()
+                    error("restore failed")
+                }
+            }
+            withTimeout(5_000) { normalWrite.await() }
+            val expected = sample().let { original ->
+                original.copy(subsItems = original.subsItems.map { it.copy(enable = false) })
+            }
+            assertEquals(expected, store.capture())
+        }
+    }
+
 }

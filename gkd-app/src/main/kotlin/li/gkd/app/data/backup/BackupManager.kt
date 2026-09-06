@@ -2,7 +2,6 @@ package li.gkd.app.data.backup
 
 import android.net.Uri
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -10,6 +9,7 @@ import li.gkd.app.app.AppContainer
 import li.gkd.app.data.RawSubscription
 import li.gkd.app.data.subscription.SubscriptionRepository
 import li.gkd.app.data.subscription.SubscriptionFileStore
+import li.gkd.app.data.subscription.SubscriptionPersistence
 import li.gkd.app.util.FolderUtils
 import li.gkd.app.util.LogUtils
 import li.gkd.app.util.ZipUtils
@@ -21,14 +21,8 @@ import li.gkd.db.SubscriptionConfigSnapshot
 
 private data class PreparedBackup(
     val dbData: SubscriptionConfigSnapshot?,
-    val storeUpdates: List<() -> Unit>,
-    val subscriptions: List<RawSubscription>,
-)
-
-private data class RestoreCheckpoint(
-    val dbData: SubscriptionConfigSnapshot,
     val storeEntries: Map<String, String>,
-    val subscriptionFiles: Map<Long, ByteArray?>,
+    val subscriptions: List<RawSubscription>,
 )
 
 object BackupManager {
@@ -86,67 +80,41 @@ object BackupManager {
                 zipFile.delete()
 
                 val prepared = prepareBackup(unzipDir)
-                val checkpoint = captureCheckpoint(prepared)
-                try {
-                    withContext(NonCancellable) {
-                        applyPreparedBackup(prepared)
-                    }
-                } catch (e: Throwable) {
-                    withContext(NonCancellable) {
-                        rollback(checkpoint, e)
-                    }
-                    throw e
-                }
+                applyPreparedBackup(prepared)
             } finally {
                 tempDir.deleteRecursively()
             }
         }
     }
 
-    private suspend fun applyPreparedBackup(prepared: PreparedBackup): Int {
-        val skipped = prepared.dbData?.let { Db.subscriptionConfigStore.merge(it) } ?: 0
-        prepared.subscriptions.forEach { SubscriptionRepository.save(it) }
-        SubscriptionRepository.reloadFromDisk()
-        prepared.storeUpdates.forEach { it() }
-        AppContainer.settingsRepository.awaitPersistence()
-        return skipped
-    }
-
-    private suspend fun captureCheckpoint(prepared: PreparedBackup): RestoreCheckpoint {
-        val subscriptionFiles = prepared.subscriptions.associate { subscription ->
-            subscription.id to SubscriptionFileStore.readBytes(subscription.id)
+    private suspend fun applyPreparedBackup(prepared: PreparedBackup): Int =
+        SubscriptionRepository.withBackupTransaction(prepared.subscriptions) { subscriptions ->
+            val previousFiles = subscriptions.associate { subscription ->
+                subscription.id to SubscriptionFileStore.readBytes(subscription.id)
+            }
+            AppContainer.settingsRepository.withBackupRestore(prepared.storeEntries) {
+                try {
+                    Db.withTransaction {
+                        val skipped = prepared.dbData?.let { Db.subscriptionConfigStore.merge(it) } ?: 0
+                        subscriptions.forEach { SubscriptionPersistence.save(it) }
+                        skipped
+                    }
+                } catch (error: Throwable) {
+                    previousFiles.forEach { (id, bytes) ->
+                        runCatching { SubscriptionFileStore.restore(id, bytes) }
+                            .exceptionOrNull()?.let(error::addSuppressed)
+                    }
+                    throw error
+                }
+            }
         }
-        return RestoreCheckpoint(
-            dbData = Db.subscriptionConfigStore.capture(),
-            storeEntries = AppContainer.settingsRepository.exportBackupEntries(),
-            subscriptionFiles = subscriptionFiles,
-        )
-    }
-
-    private suspend fun rollback(checkpoint: RestoreCheckpoint, cause: Throwable) {
-        runCatching { Db.subscriptionConfigStore.restore(checkpoint.dbData) }
-            .exceptionOrNull()?.let(cause::addSuppressed)
-        runCatching { restoreSubscriptionFiles(checkpoint.subscriptionFiles) }
-            .exceptionOrNull()?.let(cause::addSuppressed)
-        runCatching {
-            AppContainer.settingsRepository.prepareRestore(checkpoint.storeEntries).forEach { it() }
-            AppContainer.settingsRepository.awaitPersistence()
-        }.exceptionOrNull()?.let(cause::addSuppressed)
-        runCatching { SubscriptionRepository.reloadFromDisk() }
-            .exceptionOrNull()?.let(cause::addSuppressed)
-    }
-
-    private fun restoreSubscriptionFiles(files: Map<Long, ByteArray?>) {
-        files.forEach { (id, bytes) ->
-            SubscriptionFileStore.restore(id, bytes)
-        }
-    }
 
     private suspend fun prepareBackup(unzipDir: File): PreparedBackup =
-        withContext(Dispatchers.Default) {
+        withContext(Dispatchers.IO) {
             val dbFile = unzipDir.resolve("db.json")
             val dbData = if (dbFile.exists() && dbFile.isFile) {
-                BackupFormat.decode(dbFile.readText()).toSnapshot()
+                val text = dbFile.readText()
+                withContext(Dispatchers.Default) { BackupFormat.decode(text).toSnapshot() }
             } else {
                 null
             }
@@ -155,7 +123,6 @@ object BackupManager {
                 if (!file.exists() || !file.isFile) return@mapNotNull null
                 filename to file.readText()
             }
-            val storeUpdates = AppContainer.settingsRepository.prepareRestore(storeEntries.toMap())
             val subsDir = unzipDir.resolve("subscription")
             val subscriptions = if (subsDir.exists() && subsDir.isDirectory) {
                 (subsDir.listFiles { file ->
@@ -163,7 +130,8 @@ object BackupManager {
                 } ?: emptyArray()).filterNotNull().sortedBy { it.name }.map { file ->
                     val fileId = file.nameWithoutExtension.toLongOrNull()
                         ?: error("非法订阅文件名: ${file.name}")
-                    json.decodeFromString<RawSubscription>(file.readText()).also { subscription ->
+                    val text = file.readText()
+                    withContext(Dispatchers.Default) { json.decodeFromString<RawSubscription>(text) }.also { subscription ->
                         require(subscription.id == fileId) {
                             "订阅文件id不一致: $fileId != ${subscription.id}"
                         }
@@ -178,7 +146,7 @@ object BackupManager {
             }
             PreparedBackup(
                 dbData = dbData,
-                storeUpdates = storeUpdates,
+                storeEntries = storeEntries.toMap(),
                 subscriptions = subscriptions,
             )
         }

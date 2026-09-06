@@ -8,6 +8,8 @@ import android.util.LruCache
 import android.view.accessibility.AccessibilityNodeInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -64,19 +66,12 @@ data class TopActivity(
     }
 }
 
-val topActivityFlow: StateFlow<TopActivity>
-    field = MutableStateFlow(TopActivity())
-private var lastValidActivity: TopActivity = topActivityFlow.value
-    set(value) {
-        if (value.activityId != null) {
-            field = value
-        }
-    }
+val activityRuleFlow: StateFlow<ActivityRule>
+    get() = A11yState.activityRuleFlow
 
-private var activityLogCount = 0
-private var lastActivityUpdateTime = 0L
-private var lastActivityForceUpdateTime = 0L
-private val tempActivityLogList = mutableListOf<ActivityLog>()
+val topActivityFlow = activityRuleFlow.map { it.topActivity }.distinctUntilChanged()
+val currentTopActivity: TopActivity
+    get() = activityRuleFlow.value.topActivity
 
 private object ActivityCache : LruCache<Pair<String, String>, Boolean>(256) {
     override fun create(key: Pair<String, String>): Boolean = try {
@@ -94,7 +89,7 @@ fun isActivity(
     appId: String,
     activityId: String,
 ): Boolean {
-    return topActivityFlow.value.sameAs(appId, activityId) || ActivityCache.get(appId to activityId)
+    return currentTopActivity.sameAs(appId, activityId) || ActivityCache.get(appId to activityId)
 }
 
 class ActivityRule(
@@ -132,117 +127,149 @@ class ActivityRule(
         get() = currentRules.any { r -> r.checkForced() && (r.status == RuleStatus.StatusOk || r.status == RuleStatus.Status5) }
 }
 
-val activityRuleFlow: StateFlow<ActivityRule>
-    field = MutableStateFlow(ActivityRule())
-
-private var lastAppId = ""
-
 sealed class ActivityScene {
     data object ScreenOn : ActivityScene()
     data object A11y : ActivityScene()
     data object TaskStack : ActivityScene()
 }
 
-// 外部必须使用 synchronized(topActivityFlow) 来保证更新的原子性
+object A11yState {
+    private val lock = Any()
+
+    // Resolving the foreground activity can block on the privileged process. Keep that
+    // query, its checks and the update in one critical section shared by every writer.
+    fun <T> withTopActivityLock(block: () -> T): T = synchronized(lock, block)
+
+    val activityRuleFlow: StateFlow<ActivityRule>
+        field = MutableStateFlow(ActivityRule())
+    val currentRule: ActivityRule
+        get() = synchronized(lock) { activityRuleFlow.value }
+
+    fun onScreenForcedActive(): Unit = synchronized(lock) {
+        val top = activityRuleFlow.value.topActivity
+        updateTopActivity(top.appId, top.activityId, ActivityScene.ScreenOn)
+    }
+
+    private var lastValidActivity: TopActivity = activityRuleFlow.value.topActivity
+        set(value) {
+            if (value.activityId != null) {
+                field = value
+            }
+        }
+
+    private var activityLogCount = 0
+    private var lastActivityUpdateTime = 0L
+    private var lastActivityForceUpdateTime = 0L
+    private val tempActivityLogList = mutableListOf<ActivityLog>()
+
+    private var lastAppId = ""
+
+    fun updateTopActivity(
+        appId: String,
+        activityId: String?,
+        scene: ActivityScene = ActivityScene.A11y,
+        @CallSite loc: String = "",
+    ): Unit = synchronized(lock) {
+        val t = System.currentTimeMillis()
+        if (scene == ActivityScene.TaskStack) {
+            updateTopTaskAppId(appId)
+        }
+        val oldActivity = activityRuleFlow.value.topActivity
+        val oldActivityRule = activityRuleFlow.value
+        val idChanged = (scene == ActivityScene.ScreenOn || appId != oldActivityRule.topActivity.appId)
+        val isSame = scene != ActivityScene.ScreenOn && oldActivity.sameAs(appId, activityId)
+        if (scene == ActivityScene.TaskStack) {
+            lastActivityForceUpdateTime = t
+        } else if (scene == ActivityScene.A11y) {
+            if (idChanged && lastActivityForceUpdateTime > 0) {
+                // ITaskStackListener 大部分场景快于无障碍
+                if (t - lastActivityForceUpdateTime < 1000) return
+                if (activityId != null && t - lastActivityForceUpdateTime < 3000) return
+            }
+            if (isSame && t - lastActivityUpdateTime < 1000) return
+        }
+        val number = if (isSame) {
+            oldActivity.number + 1
+        } else {
+            0
+        }
+        val topActivity = TopActivity(
+            appId = appId,
+            activityId = activityId ?: lastValidActivity.takeIf { it.appId == appId }?.activityId,
+            number = number,
+        )
+        lastValidActivity = oldActivity
+        lastActivityUpdateTime = t
+        tempActivityLogList.add(
+            ActivityLog(
+                appId = appId,
+                activityId = activityId,
+                ctime = t,
+            )
+        )
+        if (tempActivityLogList.size >= 16 || appId == META.appId) {
+            val logs = tempActivityLogList.toTypedArray()
+            tempActivityLogList.clear()
+            appScope.launchLogged {
+                Db.activityLogDao.insert(*logs)
+            }
+        }
+        if (activityLogCount++ % 100 == 0) {
+            appScope.launchLogged { Db.activityLogDao.deleteKeepLatest() }
+        }
+        val ruleSummary = subscriptionState.ruleSummaryFlow.value
+        val topChanged = idChanged || oldActivityRule.topActivity != topActivity
+        val ruleChanged = oldActivityRule.ruleSummary !== ruleSummary
+        if (topChanged || ruleChanged) {
+            val newActivityRule = ActivityRule(
+                ruleSummary = ruleSummary,
+                topActivity = topActivity,
+            )
+            if (idChanged) {
+                val oldAppId = lastAppId
+                lastAppId = appId
+                appScope.launchLogged {
+                    Db.appLastVisitDao.insert(oldAppId, appId, t)
+                }
+                appChangeTime = t
+                ruleSummary.globalRules.forEach { it.resetState(t) }
+                ruleSummary.appIdToRules[oldActivityRule.topActivity.appId]?.forEach { it.resetState(t) }
+                newActivityRule.appRules.forEach { it.resetState(t) }
+            } else {
+                newActivityRule.currentRules.forEach { r ->
+                    when (r.resetMatchType) {
+                        ResetMatchType.App -> {
+                            if (r.isFirstMatchApp) {
+                                r.resetState(t)
+                            }
+                        }
+
+                        ResetMatchType.Activity -> r.resetState(t)
+                        ResetMatchType.Match -> {
+                            // is new rule
+                            if (!oldActivityRule.currentRules.contains(r)) {
+                                r.resetState(t)
+                            }
+                        }
+                    }
+                }
+            }
+            activityRuleFlow.value = newActivityRule
+            LogUtils.d(
+                "${oldActivity.format()} -> ${topActivity.format()} (scene=$scene)",
+                loc = loc,
+                tag = "updateTopActivity",
+            )
+        }
+    }
+}
+
 fun updateTopActivity(
     appId: String,
     activityId: String?,
     scene: ActivityScene = ActivityScene.A11y,
     @CallSite loc: String = "",
-) {
-    val t = System.currentTimeMillis()
-    if (scene == ActivityScene.TaskStack) {
-        updateTopTaskAppId(appId)
-    }
-    val oldActivity = topActivityFlow.value
-    val oldActivityRule = activityRuleFlow.value
-    val idChanged = (scene == ActivityScene.ScreenOn || appId != oldActivityRule.topActivity.appId)
-    val isSame = scene != ActivityScene.ScreenOn && oldActivity.sameAs(appId, activityId)
-    if (scene == ActivityScene.TaskStack) {
-        lastActivityForceUpdateTime = t
-    } else if (scene == ActivityScene.A11y) {
-        if (idChanged && lastActivityForceUpdateTime > 0) {
-            // ITaskStackListener 大部分场景快于无障碍
-            if (t - lastActivityForceUpdateTime < 1000) return
-            if (activityId != null && t - lastActivityForceUpdateTime < 3000) return
-        }
-        if (isSame && t - lastActivityUpdateTime < 1000) return
-    }
-    val number = if (isSame) {
-        oldActivity.number + 1
-    } else {
-        0
-    }
-    topActivityFlow.value = TopActivity(
-        appId = appId,
-        activityId = activityId ?: lastValidActivity.takeIf { it.appId == appId }?.activityId,
-        number = number,
-    )
-    lastValidActivity = oldActivity
-    lastActivityUpdateTime = t
-    tempActivityLogList.add(
-        ActivityLog(
-            appId = appId,
-            activityId = activityId,
-            ctime = t,
-        )
-    )
-    if (tempActivityLogList.size >= 16 || appId == META.appId) {
-        val logs = tempActivityLogList.toTypedArray()
-        tempActivityLogList.clear()
-        appScope.launchLogged {
-            Db.activityLogDao.insert(*logs)
-        }
-    }
-    if (activityLogCount++ % 100 == 0) {
-        appScope.launchLogged { Db.activityLogDao.deleteKeepLatest() }
-    }
-    val topActivity = topActivityFlow.value
-    val ruleSummary = subscriptionState.ruleSummaryFlow.value
-    val topChanged = idChanged || oldActivityRule.topActivity != topActivity
-    val ruleChanged = oldActivityRule.ruleSummary !== ruleSummary
-    if (topChanged || ruleChanged) {
-        val newActivityRule = ActivityRule(
-            ruleSummary = ruleSummary,
-            topActivity = topActivity,
-        )
-        if (idChanged) {
-            val oldAppId = lastAppId
-            lastAppId = appId
-            appScope.launchLogged {
-                Db.appLastVisitDao.insert(oldAppId, appId, t)
-            }
-            appChangeTime = t
-            ruleSummary.globalRules.forEach { it.resetState(t) }
-            ruleSummary.appIdToRules[oldActivityRule.topActivity.appId]?.forEach { it.resetState(t) }
-            newActivityRule.appRules.forEach { it.resetState(t) }
-        } else {
-            newActivityRule.currentRules.forEach { r ->
-                when (r.resetMatchType) {
-                    ResetMatchType.App -> {
-                        if (r.isFirstMatchApp) {
-                            r.resetState(t)
-                        }
-                    }
-
-                    ResetMatchType.Activity -> r.resetState(t)
-                    ResetMatchType.Match -> {
-                        // is new rule
-                        if (!oldActivityRule.currentRules.contains(r)) {
-                            r.resetState(t)
-                        }
-                    }
-                }
-            }
-        }
-        activityRuleFlow.value = newActivityRule
-        LogUtils.d(
-            "${oldActivity.format()} -> ${topActivityFlow.value.format()} (scene=$scene)",
-            loc = loc,
-            tag = "updateTopActivity",
-        )
-    }
-}
+) = A11yState.updateTopActivity(appId, activityId, scene, loc)
 
 @Volatile
 var lastTriggerRule: ResolvedRule? = null

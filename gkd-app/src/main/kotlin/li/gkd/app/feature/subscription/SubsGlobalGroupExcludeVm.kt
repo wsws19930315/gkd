@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.map
 import li.gkd.app.MainViewModel
 import li.gkd.app.data.AppInfo
 import li.gkd.app.data.ExcludeData
+import li.gkd.app.data.ruleconfig.RuleGroupConfigService
+import li.gkd.app.domain.rule.RuleGroupTarget
 import li.gkd.app.data.RawSubscription
 import li.gkd.app.store.storeFlow
 import li.gkd.app.store.settingsRepository
@@ -143,10 +145,11 @@ class SubsGlobalGroupExcludeVm(
     val editableFlow: StateFlow<Boolean>
         field = MutableStateFlow(false)
 
+    private var editBaseExclude: ExcludeData? = null
+
     private val changedValue: ExcludeData?
         get() {
-            val currentExclude = uiState.value.value?.config?.value?.excludeData
-                ?: return null
+            val currentExclude = editBaseExclude ?: return null
             val newExclude = ExcludeData.parse(excludeTextFlow.value)
             return if (newExclude != currentExclude) {
                 newExclude
@@ -169,6 +172,7 @@ class SubsGlobalGroupExcludeVm(
     fun setEditable(value: Boolean) {
         if (value && !editableFlow.value) {
             val excludeData = uiState.value.value?.config?.value?.excludeData ?: return
+            editBaseExclude = excludeData
             excludeTextFlow.value = excludeData.stringify()
         }
         editableFlow.value = value
@@ -200,31 +204,19 @@ class SubsGlobalGroupExcludeVm(
 
     suspend fun saveExcludeText(): Boolean {
         val newExclude = changedValue ?: return false
-        val currentConfig = uiState.value.value?.config?.value
-            ?: error("订阅配置尚未加载")
-        val subsConfig = (currentConfig.subsConfig ?: SubsGlobalGroupConfig(
-            subsId = route.subsItemId,
-            groupKey = route.groupKey,
-        )).copy(exclude = newExclude.stringify())
-        Db.subsGlobalGroupConfigDao.upsert(subsConfig)
+        RuleGroupConfigService.replaceExclude(
+            target = RuleGroupTarget.Global(route.subsItemId, route.groupKey),
+            expected = checkNotNull(editBaseExclude),
+            value = newExclude,
+        )
+        editBaseExclude = newExclude
         return true
     }
 
     suspend fun setAppChecked(appId: String, checked: Boolean) {
-        val state = uiState.value.value ?: error("订阅尚未加载")
-        val config = state.config.value ?: error("订阅配置尚未加载")
-        val excludeData = config.excludeData
-        val subsConfig = (config.subsConfig ?: SubsGlobalGroupConfig(
-            subsId = route.subsItemId,
-            groupKey = route.groupKey,
-        )).copy(
-            exclude = excludeData.copy(
-                appIds = excludeData.appIds.toMutableMap().apply {
-                    set(appId, !checked)
-                },
-            ).stringify(),
+        RuleGroupConfigService.updateGroupEnabled(
+            RuleGroupTarget.Global(route.subsItemId, route.groupKey, appId),
+            checked,
         )
-        Db.subsGlobalGroupConfigDao.upsert(subsConfig)
     }
-
 }

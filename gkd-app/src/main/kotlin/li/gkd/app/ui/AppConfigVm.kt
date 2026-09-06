@@ -1,5 +1,6 @@
 package li.gkd.app.ui
 
+import li.gkd.app.domain.rule.toRuleGroupTarget
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -299,14 +300,10 @@ class AppConfigVm(
     suspend fun setGroupEnabled(
         subscription: RawSubscription,
         group: RawSubscription.RawGroupProps,
-        subsConfig: SubsGroupConfig?,
         enabled: Boolean,
     ) {
         RuleGroupConfigService.updateGroupEnabled(
-            subscription,
-            route.appId,
-            group,
-            subsConfig,
+            group.toRuleGroupTarget(subscription.id, route.appId),
             enabled,
         )
     }

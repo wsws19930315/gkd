@@ -1,7 +1,6 @@
 package li.gkd.app.data.ruleconfig
 
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
 import li.gkd.app.data.ExcludeData
 import li.gkd.app.data.RawSubscription
 import li.gkd.app.data.subscription.SubscriptionRepository
@@ -30,48 +29,62 @@ object RuleGroupConfigService {
         }
     }
 
-    suspend fun queryGroupConfig(target: RuleGroupTarget): SubsGroupConfig? =
-        groupConfig(target).first()
+    suspend fun queryGroupConfig(target: RuleGroupTarget): SubsGroupConfig? = when (target) {
+        is RuleGroupTarget.App -> Db.subsAppGroupConfigDao.getConfig(
+            target.subsId, target.appId, target.groupKey,
+        )
+        is RuleGroupTarget.Global -> Db.subsGlobalGroupConfigDao.getConfig(
+            target.subsId, target.groupKey,
+        )
+    }
 
-    suspend fun updateGroupEnabled(
-        subscription: RawSubscription,
-        appId: String?,
-        group: RawSubscription.RawGroupProps,
-        currentConfig: SubsGroupConfig?,
-        enabled: Boolean,
-    ) {
-        val newConfig = when {
-            appId != null && group is RawSubscription.RawGlobalGroup -> {
-                val excludeData = ExcludeData.parse(currentConfig?.exclude)
-                (currentConfig ?: SubsGlobalGroupConfig(
-                    subsId = subscription.id,
-                    groupKey = group.key,
-                )).withExclude(
-                    exclude = excludeData.copy(
-                        appIds = excludeData.appIds.toMutableMap().apply {
-                            set(appId, !enabled)
-                        },
-                    ).stringify(),
-                )
-            }
-
-            appId != null -> currentConfig?.withEnable(enabled) ?: SubsAppGroupConfig(
-                subsId = subscription.id,
-                appId = appId,
-                groupKey = group.key,
-                enable = enabled,
-            )
-
-            else -> {
-                group as RawSubscription.RawGlobalGroup
-                currentConfig?.withEnable(enabled) ?: SubsGlobalGroupConfig(
-                    subsId = subscription.id,
-                    groupKey = group.key,
-                    enable = enabled,
-                )
+    suspend fun updateGroupEnabled(target: RuleGroupTarget, enabled: Boolean?) {
+        updateConfig(target) { current ->
+            if (target is RuleGroupTarget.Global && target.pageAppId != null) {
+                val exclude = ExcludeData.parse(current.exclude)
+                current.withExclude(exclude.copy(
+                    appIds = exclude.appIds.toMutableMap().apply {
+                        if (enabled == null) remove(target.pageAppId)
+                        else set(target.pageAppId, !enabled)
+                    },
+                ).stringify())
+            } else {
+                current.withEnable(enabled)
             }
         }
-        save(newConfig)
+    }
+
+    suspend fun replaceExclude(
+        target: RuleGroupTarget,
+        expected: ExcludeData,
+        value: ExcludeData,
+    ) {
+        updateConfig(target) { current ->
+            check(ExcludeData.parse(current.exclude) == expected) {
+                "排除配置已被其他操作修改，请重新打开编辑"
+            }
+            current.withExclude(value.stringify())
+        }
+    }
+
+    suspend fun toggleActivityExclusion(target: RuleGroupTarget, appId: String, activityId: String) {
+        updateConfig(target) { current ->
+            current.withExclude(ExcludeData.parse(current.exclude).switch(appId, activityId).stringify())
+        }
+    }
+
+    private suspend fun updateConfig(
+        target: RuleGroupTarget,
+        transform: (SubsGroupConfig) -> SubsGroupConfig,
+    ) {
+        when (target) {
+            is RuleGroupTarget.App -> Db.subscriptionConfigStore.updateAppGroupConfig(
+                target.subsId, target.appId, target.groupKey,
+            ) { transform(it) as SubsAppGroupConfig }
+            is RuleGroupTarget.Global -> Db.subscriptionConfigStore.updateGlobalGroupConfig(
+                target.subsId, target.groupKey,
+            ) { transform(it) as SubsGlobalGroupConfig }
+        }
     }
 
     suspend fun batchUpdateGroupEnabled(
@@ -201,7 +214,7 @@ object RuleGroupConfigService {
         }
     }
 
-    suspend fun save(config: SubsGroupConfig) {
+    private suspend fun save(config: SubsGroupConfig) {
         when (config) {
             is SubsAppGroupConfig -> Db.subsAppGroupConfigDao.upsert(config)
             is SubsGlobalGroupConfig -> Db.subsGlobalGroupConfigDao.upsert(config)

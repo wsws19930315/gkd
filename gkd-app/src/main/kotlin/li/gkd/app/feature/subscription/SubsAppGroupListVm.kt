@@ -1,5 +1,6 @@
 package li.gkd.app.feature.subscription
 
+import li.gkd.app.domain.rule.RuleGroupTarget
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -119,15 +120,10 @@ class SubsAppGroupListVm(
 
     suspend fun setGroupEnabled(
         group: RawSubscription.RawAppGroup,
-        subsConfig: SubsAppGroupConfig?,
         enabled: Boolean,
     ) {
-        val rawSubscription = subscription.requireValue()
         RuleGroupConfigService.updateGroupEnabled(
-            rawSubscription,
-            route.appId,
-            group,
-            subsConfig,
+            RuleGroupTarget.App(route.subsItemId, route.appId, group.key),
             enabled,
         )
     }

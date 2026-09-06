@@ -293,7 +293,7 @@ fun SubsCategoryGroupPage(route: SubsCategoryGroupRoute) {
                             },
                             onCheckedChange = { enabled ->
                                 scope.launchUi {
-                                    vm.setGroupEnabled(app.id, group, subsConfig, enabled)
+                                    vm.setGroupEnabled(app.id, group, enabled)
                                 }
                             },
                         )

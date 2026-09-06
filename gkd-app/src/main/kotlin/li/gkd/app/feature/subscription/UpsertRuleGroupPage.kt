@@ -26,8 +26,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavKey
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import li.gkd.app.MainActivity
 import li.gkd.app.ui.component.PerfIcon
@@ -63,11 +61,9 @@ fun UpsertRuleGroupPage(route: UpsertRuleGroupRoute) {
         val editedText by vm.textFlow.collectAsStateWithLifecycle()
         val text = editedText ?: state.initialText
 
-        val checkIfSaveText = throttle(vm.scope.launchUiAction(Dispatchers.Default) {
+        val checkIfSaveText = throttle(vm.scope.launchUiAction {
             if (vm.hasTextChanged()) {
-                withContext(Dispatchers.Main.immediate) {
-                    context.imeController.requestHide()
-                }
+                context.imeController.requestHide()
                 if (!mainVm.dialogRequests.confirm(
                         title = "提示",
                         text = "当前内容未保存，是否放弃编辑？",
@@ -81,8 +77,8 @@ fun UpsertRuleGroupPage(route: UpsertRuleGroupRoute) {
             mainVm.popPage()
         })
 
-        val onClickSave = throttle(vm.scope.launchUiAction(Dispatchers.Main) {
-            val addedAppId = withContext(Dispatchers.Default) { vm.saveRule() }
+        val onClickSave = throttle(vm.scope.launchUiAction {
+            val addedAppId = vm.saveRule()
             context.imeController.hideAndAwait()
             if (forward) {
                 if (appId == null) {

@@ -226,7 +226,7 @@ fun SubsAppGroupListPage(route: SubsAppGroupListRoute) {
                         },
                         onCheckedChange = { enabled ->
                             scope.launchUi {
-                                vm.setGroupEnabled(group, subsConfig, enabled)
+                                vm.setGroupEnabled(group, enabled)
                             }
                         },
                         focusGroup = focusGroup,

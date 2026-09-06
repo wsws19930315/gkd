@@ -28,10 +28,7 @@ import li.gkd.app.ui.share.launchUiAction
 import li.gkd.app.ui.share.launchUi
 import li.gkd.app.util.throttle
 import li.gkd.app.util.ToastUtils.toast
-import li.gkd.db.SubsAppGroupConfig
 import li.gkd.db.SubsGroupConfig
-import li.gkd.db.withEnable
-import li.gkd.db.withExclude
 
 private data class ExcludeEditSession(
     val groupState: RuleGroupTarget,
@@ -82,23 +79,13 @@ class RuleGroupState(
         }
     }
 
-    private suspend fun resetGroupSwitch(
-        state: RuleGroupTarget,
-        group: RawSubscription.RawGroupProps,
-        subsConfig: SubsGroupConfig,
-    ): String {
-        val pageAppId = state.pageAppId
-        if (group is RawSubscription.RawGlobalGroup && pageAppId != null) {
-            val excludeData = ExcludeData.parse(subsConfig.exclude)
-            RuleGroupConfigService.save(
-                subsConfig.withExclude(
-                    exclude = excludeData.clear(appId = pageAppId).stringify(),
-                ),
-            )
-            return "已重置局部开关至默认值"
+    private suspend fun resetGroupSwitch(state: RuleGroupTarget): String {
+        RuleGroupConfigService.updateGroupEnabled(state, null)
+        return if (state is RuleGroupTarget.Global && state.pageAppId != null) {
+            "已重置局部开关至默认值"
+        } else {
+            "已重置开关至默认值"
         }
-        RuleGroupConfigService.save(subsConfig.withEnable(null))
-        return "已重置开关至默认值"
     }
 
     private suspend fun deleteGroup(
@@ -126,17 +113,13 @@ class RuleGroupState(
 
     private suspend fun saveChangedExclude(
         session: ExcludeEditSession,
-        subscription: RawSubscription,
         excludeData: ExcludeData,
     ) {
-        val state = session.groupState as? RuleGroupTarget.App
-            ?: error("require app group")
-        val newSubsConfig = (session.originalConfig ?: SubsAppGroupConfig(
-            subsId = subscription.id,
-            appId = state.appId,
-            groupKey = state.groupKey,
-        )).withExclude(excludeData.stringify())
-        RuleGroupConfigService.save(newSubsConfig)
+        RuleGroupConfigService.replaceExclude(
+            target = session.groupState,
+            expected = ExcludeData.parse(session.originalConfig?.exclude),
+            value = excludeData,
+        )
     }
 
     @Composable
@@ -175,7 +158,7 @@ class RuleGroupState(
                         if (showGroupState.pageAppId != null) {
                             if (excludeData.appIds.contains(showGroupState.pageAppId)) {
                                 mainVm.scope.launchUiAction {
-                                    toast(resetGroupSwitch(showGroupState, showGroup, subsConfig))
+                                    toast(resetGroupSwitch(showGroupState))
                                 }
                             } else {
                                 null
@@ -183,14 +166,14 @@ class RuleGroupState(
                         } else {
                             subsConfig.enable?.let {
                                 mainVm.scope.launchUiAction {
-                                    toast(resetGroupSwitch(showGroupState, showGroup, subsConfig))
+                                    toast(resetGroupSwitch(showGroupState))
                                 }
                             }
                         }
                     } else {
                         subsConfig.enable?.let {
                             mainVm.scope.launchUiAction {
-                                toast(resetGroupSwitch(showGroupState, showGroup, subsConfig))
+                                toast(resetGroupSwitch(showGroupState))
                             }
                         }
                     }
@@ -257,7 +240,6 @@ class RuleGroupState(
                                         mainVm.scope.launchUi {
                                             saveChangedExclude(
                                                 excludeEditSession,
-                                                excludeSubs,
                                                 newValue,
                                             )
                                             toast("更新成功")

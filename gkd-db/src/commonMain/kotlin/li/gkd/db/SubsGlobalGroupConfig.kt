@@ -39,6 +39,9 @@ data class SubsGlobalGroupConfig(
         @Query("SELECT * FROM subs_global_group_config WHERE subs_id=:subsId AND group_key=:groupKey")
         fun queryConfig(subsId: Long, groupKey: Int): Flow<SubsGlobalGroupConfig?>
 
+        @Query("SELECT * FROM subs_global_group_config WHERE subs_id=:subsId AND group_key=:groupKey")
+        suspend fun getConfig(subsId: Long, groupKey: Int): SubsGlobalGroupConfig?
+
         @Query("SELECT * FROM subs_global_group_config WHERE subs_id IN (:subsIds)")
         suspend fun queryBySubsIds(subsIds: List<Long>): List<SubsGlobalGroupConfig>
 

@@ -209,7 +209,7 @@ fun SubsGlobalGroupListPage(route: SubsGlobalGroupListRoute) {
                         },
                         onCheckedChange = { enabled ->
                             scope.launchUi {
-                                vm.setGroupEnabled(group, subsConfig, enabled)
+                                vm.setGroupEnabled(group, enabled)
                             }
                         },
                         isSelectedMode = isSelectedMode,

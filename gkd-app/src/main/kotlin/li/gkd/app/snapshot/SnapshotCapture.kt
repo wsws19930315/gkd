@@ -16,7 +16,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import li.gkd.app.a11y.A11yRuleEngine
-import li.gkd.app.a11y.topActivityFlow
+import li.gkd.app.a11y.currentTopActivity
 import li.gkd.app.data.ComplexSnapshot
 import li.gkd.app.data.RpcError
 import li.gkd.app.data.info2nodeList
@@ -138,11 +138,11 @@ object SnapshotCapture {
         privilegeContextFlow.value?.run {
             topCpn()?.className
         }?.let { return it }
-        var topActivity = topActivityFlow.value
+        var topActivity = currentTopActivity
         var waited = 0L
         while (topActivity.appId != appId && waited < 2000) {
             delay(100.milliseconds)
-            topActivity = topActivityFlow.value
+            topActivity = currentTopActivity
             waited += 100
         }
         return topActivity.activityId.takeIf { topActivity.appId == appId }

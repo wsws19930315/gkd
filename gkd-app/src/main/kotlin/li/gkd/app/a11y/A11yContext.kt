@@ -60,7 +60,7 @@ class A11yContext(
     }
 
     fun clearNodeCache(eventNode: AccessibilityNodeInfo? = null) {
-        if (rootCache.value?.packageName != topActivityFlow.value.appId) {
+        if (rootCache.value?.packageName != currentTopActivity.appId) {
             rootCache.value = null
         }
         if (eventNode != null) {

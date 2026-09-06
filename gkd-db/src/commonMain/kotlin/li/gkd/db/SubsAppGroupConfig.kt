@@ -40,6 +40,9 @@ data class SubsAppGroupConfig(
         @Query("SELECT * FROM subs_app_group_config WHERE subs_id=:subsId AND app_id=:appId AND group_key=:groupKey")
         fun queryConfig(subsId: Long, appId: String, groupKey: Int): Flow<SubsAppGroupConfig?>
 
+        @Query("SELECT * FROM subs_app_group_config WHERE subs_id=:subsId AND app_id=:appId AND group_key=:groupKey")
+        suspend fun getConfig(subsId: Long, appId: String, groupKey: Int): SubsAppGroupConfig?
+
         @Query("SELECT * FROM subs_app_group_config WHERE subs_id IN (:subsIds)")
         suspend fun queryBySubsIds(subsIds: List<Long>): List<SubsAppGroupConfig>
 

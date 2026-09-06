@@ -30,8 +30,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import li.gkd.app.a11y.A11yState
 import li.gkd.app.a11y.ActivityScene
 import li.gkd.app.a11y.topActivityFlow
+import li.gkd.app.a11y.currentTopActivity
 import li.gkd.app.a11y.updateTopActivity
 import li.gkd.app.notif.NotificationCatalog
 import li.gkd.app.permission.PermissionStates
@@ -62,7 +64,7 @@ class ActivityService : OverlayWindowService(
                 .padding(4.dp)
         ) {
             CompositionLocalProvider(LocalContentColor provides contentColorFor(bgColor)) {
-                val topActivity by topActivityFlow.collectAsStateWithLifecycle()
+                val topActivity by topActivityFlow.collectAsStateWithLifecycle(initialValue = currentTopActivity)
                 val hasAuth by activityOkFlow.collectAsStateWithLifecycle()
                 ClosableTitle(
                     title = if (hasAuth) "记录服务" else "记录服务(无权限)"
@@ -110,7 +112,7 @@ class ActivityService : OverlayWindowService(
                 }
             }
             if (!A11yService.isRunning.value) {
-                synchronized(topActivityFlow) {
+                A11yState.withTopActivityLock {
                     privilegeContextFlow.value?.run {
                         topCpn()?.let { cpn ->
                             updateTopActivity(

@@ -4,6 +4,7 @@ import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -107,12 +108,37 @@ object SubscriptionRepository {
             ?: throw (snapshot.loadErrors[id] ?: IllegalStateException("订阅不存在: $id"))
     }
 
-    suspend fun reloadFromDisk() = withContext(Dispatchers.IO) {
+    /**
+     * Keeps backup file changes and compensation exclusive with subscription updates.
+     * The block owns the database transaction and uses SubscriptionPersistence directly.
+     */
+    suspend fun <T> withBackupTransaction(
+        subscriptions: List<RawSubscription>,
+        block: suspend (List<RawSubscription>) -> T,
+    ): T = withContext(Dispatchers.IO) {
         updateMutex.withStateLock {
-            refreshRawSubscriptions(
-                items = Db.subsItemDao.queryAll(),
-                previous = SubscriptionSnapshot(),
-            )
+            val previous = snapshotFlow.value.value ?: refreshRawSubscriptions(Db.subsItemDao.queryAll())
+            val prepared = subscriptions.map { prepareSubscription(it, previous) }
+            // Waiting for an in-flight refresh remains cancellable; an accepted restore completes.
+            withContext(NonCancellable) {
+                try {
+                    val result = block(prepared)
+                    refreshRawSubscriptions(
+                        items = Db.subsItemDao.queryAll(),
+                        previous = SubscriptionSnapshot(),
+                    )
+                    result
+                } catch (error: Throwable) {
+                    // Compensation can itself fail: publish what is actually readable from disk.
+                    runCatching {
+                        refreshRawSubscriptions(
+                            items = Db.subsItemDao.queryAll(),
+                            previous = SubscriptionSnapshot(),
+                        )
+                    }.exceptionOrNull()?.let(error::addSuppressed)
+                    throw error
+                }
+            }
         }
     }
 
@@ -389,17 +415,7 @@ object SubscriptionRepository {
                 items = Db.subsItemDao.queryAll(),
                 previous = SubscriptionSnapshot(),
             )
-        val nextSubscription = if (
-            id < 0 && snapshot.subscriptions[id]?.version == subscription.version
-        ) {
-            subscription.copy(
-                version = subscription.version + 1,
-                apps = subscription.apps.filterIfNotAll { it.groups.isNotEmpty() }
-                    .distinctByIfAny { it.id },
-            )
-        } else {
-            subscription
-        }
+        val nextSubscription = prepareSubscription(subscription, snapshot)
         SubscriptionPersistence.save(nextSubscription, newItem, insertItem)
         snapshotFlow.value = Loadable.Ready(snapshot.copy(
             subscriptions = snapshot.subscriptions.toMutableMap().apply {
@@ -409,6 +425,21 @@ object SubscriptionRepository {
             updateErrors = snapshot.updateErrors.toMutableMap().apply { remove(id) },
         ))
         LogUtils.d("更新订阅文件:id=$id,name=${nextSubscription.name}")
+    }
+
+    private fun prepareSubscription(
+        subscription: RawSubscription,
+        snapshot: SubscriptionSnapshot,
+    ): RawSubscription = if (
+        subscription.id < 0 && snapshot.subscriptions[subscription.id]?.version == subscription.version
+    ) {
+        subscription.copy(
+            version = subscription.version + 1,
+            apps = subscription.apps.filterIfNotAll { it.groups.isNotEmpty() }
+                .distinctByIfAny { it.id },
+        )
+    } else {
+        subscription
     }
 
     private fun load(id: Long): RawSubscription {

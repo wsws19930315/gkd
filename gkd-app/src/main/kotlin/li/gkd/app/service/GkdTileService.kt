@@ -12,7 +12,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import li.gkd.app.META
 import li.gkd.app.a11y.systemRecentCn
-import li.gkd.app.a11y.topActivityFlow
+import li.gkd.app.a11y.currentTopActivity
 import li.gkd.app.ui.app.showAccessRestrictedSettingsDialog
 import li.gkd.app.app
 import li.gkd.app.appScope
@@ -218,7 +218,7 @@ fun initA11yWhiteAppList() {
         actualFlow.collect {
             lastAppIdChangeTime = System.currentTimeMillis()
             if (!currentAppBlocked) {
-                if (topActivityFlow.value.sameAs(systemRecentCn) && currentAppUseA11y) {
+                if (currentTopActivity.sameAs(systemRecentCn) && currentAppUseA11y) {
                     // 切换无障碍会造成卡顿，在最近任务界面时，延迟这个卡顿
                     val tempTime = lastAppIdChangeTime
                     runMainPost(A11Y_WHITE_APP_AWAIT_TIME) {

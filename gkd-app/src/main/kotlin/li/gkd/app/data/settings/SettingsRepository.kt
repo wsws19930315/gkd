@@ -3,6 +3,10 @@ package li.gkd.app.data.settings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.Channel
@@ -19,6 +23,12 @@ import java.io.File
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+
+private class PreparedValueRestore(
+    val begin: () -> Unit,
+    val finish: (committed: Boolean) -> Unit,
+    val awaitPersistence: suspend () -> Unit,
+)
 
 private class PersistedValue<T>(
     val filename: String,
@@ -47,6 +57,8 @@ private class PersistedValue<T>(
     private val writeRequests = Channel<WriteRequest<T>>(Channel.CONFLATED)
     private val writeResult = MutableStateFlow(WriteResult(version = 0, error = null))
     private var currentVersion = 0L
+    private class RollbackState<T>(var value: T)
+    private var rollbackState: RollbackState<T>? = null
 
     init {
         scope.launch(Dispatchers.IO) {
@@ -82,20 +94,46 @@ private class PersistedValue<T>(
 
     fun encodeCurrent(): String = encode(state.value)
 
-    fun prepareRestore(text: String): () -> Unit {
-        val value = decode(text)
-        return { replace(value) }
+    fun prepareRestore(text: String): PreparedValueRestore {
+        val restored = decode(text)
+        var started = false
+        return PreparedValueRestore(
+            begin = {
+                synchronized(this) {
+                    check(rollbackState == null) { "设置恢复已在进行: $filename" }
+                    rollbackState = RollbackState(mutableState.value)
+                    started = true
+                    mutableState.value = restored
+                    enqueue(restored)
+                }
+            },
+            finish = { committed ->
+                synchronized(this) {
+                    if (started) {
+                        val rollback = checkNotNull(rollbackState).value
+                        rollbackState = null
+                        started = false
+                        if (!committed) {
+                            mutableState.value = rollback
+                            enqueue(rollback)
+                        }
+                    }
+                }
+            },
+            awaitPersistence = ::awaitPersistence,
+        )
     }
 
-    @Synchronized
     fun replace(value: T) {
-        mutableState.value = value
-        enqueue(value)
+        update { value }
     }
 
     @Synchronized
     fun update(transform: (T) -> T): T {
         val value = transform(mutableState.value)
+        // Keep later commands on both outcomes, without holding a lock across disk I/O.
+        // Like MutableStateFlow.update, transforms must be pure and may run more than once.
+        rollbackState?.let { it.value = transform(it.value) }
         mutableState.value = value
         enqueue(value)
         return value
@@ -120,6 +158,8 @@ class SettingsRepository(
     defaultSettings: () -> SettingsStore,
     defaultBlockMatchAppList: () -> Set<String>,
 ) {
+    private val restoreMutex = Mutex()
+
     val persistenceFailures: StateFlow<Map<String, Throwable>>
         field = MutableStateFlow(emptyMap())
 
@@ -191,6 +231,10 @@ class SettingsRepository(
         a11yScopeAppListValue.filename,
     )
 
+    /**
+     * Updates memory and enqueues persistence; use [awaitPersistence] to wait for disk.
+     * The transform must be pure: a concurrent backup restore may evaluate it twice.
+     */
     fun updateSettings(transform: (SettingsStore) -> SettingsStore): SettingsStore =
         settingsValue.update(transform)
 
@@ -219,19 +263,36 @@ class SettingsRepository(
         a11yScopeAppListValue.filename to a11yScopeAppListValue.encodeCurrent(),
     )
 
-    fun prepareRestore(entries: Map<String, String>): List<() -> Unit> = buildList {
-        entries[settingsValue.filename]?.let { add(settingsValue.prepareRestore(it)) }
-        entries[actionCountValue.filename]?.let { add(actionCountValue.prepareRestore(it)) }
-        entries[blockMatchAppListValue.filename]?.let {
-            add(blockMatchAppListValue.prepareRestore(it))
+    /** Persists imported values before [block]; on failure, rolls back while retaining later commands. */
+    suspend fun <T> withBackupRestore(entries: Map<String, String>, block: suspend () -> T): T =
+        restoreMutex.withLock {
+            // Decode everything before changing any value.
+            val restores = listOf(
+                settingsValue, actionCountValue, blockMatchAppListValue,
+                blockA11yAppListValue, a11yScopeAppListValue,
+            ).mapNotNull { value ->
+                entries[value.filename]?.let(value::prepareRestore)
+            }
+            try {
+                restores.forEach { it.begin() }
+                restores.forEach { it.awaitPersistence() }
+                val result = block()
+                restores.forEach { it.finish(true) }
+                result
+            } catch (error: Throwable) {
+                withContext(NonCancellable) {
+                    restores.forEach { restore ->
+                        runCatching { restore.finish(false) }
+                            .exceptionOrNull()?.let(error::addSuppressed)
+                    }
+                    restores.forEach { restore ->
+                        runCatching { restore.awaitPersistence() }
+                            .exceptionOrNull()?.let(error::addSuppressed)
+                    }
+                }
+                throw error
+            }
         }
-        entries[blockA11yAppListValue.filename]?.let {
-            add(blockA11yAppListValue.prepareRestore(it))
-        }
-        entries[a11yScopeAppListValue.filename]?.let {
-            add(a11yScopeAppListValue.prepareRestore(it))
-        }
-    }
 
     suspend fun awaitPersistence() = coroutineScope {
         listOf(

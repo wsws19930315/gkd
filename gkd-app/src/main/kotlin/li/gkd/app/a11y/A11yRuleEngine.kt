@@ -84,14 +84,7 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
 
     fun onScreenForcedActive() {
         // 关闭屏幕 -> Activity::onStop -> 点亮屏幕 -> Activity::onStart -> Activity::onResume
-        val a = topActivityFlow.value
-        synchronized(topActivityFlow) {
-            updateTopActivity(
-                a.appId,
-                a.activityId,
-                scene = ActivityScene.ScreenOn
-            )
-        }
+        A11yState.onScreenForcedActive()
         startQueryJob()
     }
 
@@ -124,10 +117,10 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
         onA11yFeatEvent(event)
         if (event.eventType == CONTENT_CHANGED) {
             if (!isInteractive) return // 屏幕关闭后仍然有无障碍事件 type:2048, time:8094, app:com.miui.aod, cls:android.widget.TextView
-            if (event.packageName == systemUiAppId && event.packageName != topActivityFlow.value.appId) return
+            if (event.packageName == systemUiAppId && event.packageName != currentTopActivity.appId) return
         }
         // 过滤部分输入法事件
-        if (event.packageName == imeAppId && topActivityFlow.value.appId != imeAppId) {
+        if (event.packageName == imeAppId && currentTopActivity.appId != imeAppId) {
             if (event.recordCount == 0 && event.action == 0 && !event.isFullScreen) return
         }
         // 直接丢弃自身事件，自行更新 topActivity
@@ -175,7 +168,7 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
         val latestEvent = consumedEvents.last()
         val evAppId = latestEvent.appId
         val evActivityId = latestEvent.name
-        val oldAppId = topActivityFlow.value.appId
+        val oldAppId = currentTopActivity.appId
         val rightAppId = if (oldAppId == evAppId) {
             evAppId
         } else {
@@ -183,7 +176,7 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
         }
         if (rightAppId == evAppId) {
             if (latestEvent.type == STATE_CHANGED) {
-                synchronized(topActivityFlow) {
+                A11yState.withTopActivityLock {
                     // tv.danmaku.bili, com.miui.home, com.miui.home.launcher.Launcher
                     if (isActivity(evAppId, evActivityId)) {
                         updateTopActivity(evAppId, evActivityId)
@@ -191,8 +184,8 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
                 }
             }
         }
-        if (rightAppId != topActivityFlow.value.appId) {
-            synchronized(topActivityFlow) {
+        if (rightAppId != currentTopActivity.appId) {
+            A11yState.withTopActivityLock {
                 // 从 锁屏，下拉通知栏 返回等情况, 应用不会发送事件, 但是系统组件会发送事件
                 val topCpn = privilegeContextFlow.value?.topCpn()
                 if (topCpn?.packageName == rightAppId) {
@@ -296,8 +289,8 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
     }
 
     private fun fixAppId(rightAppId: String) {
-        if (topActivityFlow.value.appId == rightAppId) return
-        synchronized(topActivityFlow) {
+        if (currentTopActivity.appId == rightAppId) return
+        A11yState.withTopActivityLock {
             val topCpn = privilegeContextFlow.value?.topCpn()
             if (topCpn?.packageName == rightAppId) {
                 updateTopActivity(topCpn.packageName, topCpn.className)
@@ -347,7 +340,7 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
                 }
             }
         }
-        val activityRule = synchronized(topActivityFlow) { activityRuleFlow.value }
+        val activityRule = A11yState.currentRule
         activityRule.currentRules.forEach { rule ->
             if (rule.status == RuleStatus.Status3 && rule.matchDelayJob.value == null) {
                 rule.matchDelayJob.value = scope.launch(actionDispatcher) {
@@ -404,7 +397,7 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
             val nodeVal = (lastNode ?: getTimeoutActiveWindow()) ?: continue
             val rightAppId = nodeVal.packageName?.toString() ?: break
             val matchApp = rule.matchActivity(rightAppId)
-            if (topActivityFlow.value.appId != rightAppId || (!matchApp && rule is AppRule)) {
+            if (currentTopActivity.appId != rightAppId || (!matchApp && rule is AppRule)) {
                 scope.launch(eventDispatcher) { fixAppId(rightAppId) }
                 return
             }
@@ -422,7 +415,7 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
             if (checkOutDate(activityRule, tempStateEvent)) break
             val actionResult = rule.performAction(target)
             if (actionResult.result) {
-                val topActivity = topActivityFlow.value
+                val topActivity = currentTopActivity
                 rule.trigger()
                 scope.launch(actionDispatcher) {
                     delay(300.milliseconds)
@@ -441,10 +434,7 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
         stateEvent: A11yEvent?
     ): Boolean {
         if (stateEvent !== latestStateEvent) return true
-        synchronized(topActivityFlow) {
-            if (activityRule !== activityRuleFlow.value) return true
-        }
-        return false
+        return activityRule !== A11yState.currentRule
     }
 
     companion object {

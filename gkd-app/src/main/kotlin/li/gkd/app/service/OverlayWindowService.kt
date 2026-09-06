@@ -52,7 +52,8 @@ import li.gkd.app.ui.style.AppTheme
 import li.gkd.app.ui.style.iconTextSize
 import li.gkd.app.util.BarUtils
 import li.gkd.app.util.ScreenUtils
-import li.gkd.app.util.mapState
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 import li.gkd.app.util.px
 import li.gkd.app.util.runMainPost
 import li.gkd.app.util.throttle
@@ -92,7 +93,8 @@ private class ShareContext {
         scope.launch {
             var canDrawOverlays = PermissionStates.drawOverlays.updateAndGet()
             topActivityFlow
-                .mapState(scope) { it.appId to it.activityId }
+                .map { it.appId to it.activityId }
+                .distinctUntilChanged()
                 .collectLatest {
                     var i = 0
                     while (i < 6 && isActive) {

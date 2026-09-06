@@ -32,7 +32,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavKey
-import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.Serializable
 import li.gkd.app.core.state.Loadable
 import li.gkd.app.data.RawSubscription
@@ -354,8 +353,8 @@ fun AppConfigPage(route: AppConfigRoute) {
                             )
                         },
                         onCheckedChange = { enabled ->
-                            scope.launchUi(Dispatchers.Default) {
-                                vm.setGroupEnabled(entry.subscription, group, subsConfig, enabled)
+                            scope.launchUi {
+                                vm.setGroupEnabled(entry.subscription, group, enabled)
                             }
                         },
                         onLongClick = onLongClick,

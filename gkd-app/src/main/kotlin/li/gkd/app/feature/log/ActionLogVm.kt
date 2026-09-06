@@ -14,17 +14,15 @@ import kotlinx.coroutines.flow.stateIn
 import li.gkd.app.data.ExcludeData
 import li.gkd.app.data.RawSubscription
 import li.gkd.app.domain.rule.RuleGroupPolicy
+import li.gkd.app.domain.rule.RuleGroupTarget
 import li.gkd.app.ui.share.BaseViewModel
 import li.gkd.app.subscriptionState
 import li.gkd.app.appInfoRepository
 import li.gkd.app.a11y.launcherAppId
 import li.gkd.db.ActionLog
-import li.gkd.db.SubsAppGroupConfig
 import li.gkd.db.Db
-import li.gkd.db.SubsGlobalGroupConfig
 import li.gkd.db.SubsGroupConfig
 import li.gkd.db.RuleGroupType
-import li.gkd.db.withExclude
 
 data class ActionLogListItem(
     val actionLog: ActionLog,
@@ -148,43 +146,20 @@ class ActionLogVm(
         val state = dialogStateFlow.value ?: return
         val checked = state.globalAppChecked ?: return
         val actionLog = state.actionLog
-        val subsConfig = state.subsConfig ?: SubsGlobalGroupConfig(
-            subsId = actionLog.subsId,
-            groupKey = actionLog.groupKey,
-        )
-        val oldExclude = ExcludeData.parse(subsConfig.exclude)
-        RuleGroupConfigService.save(
-            subsConfig.withExclude(
-                exclude = oldExclude.copy(
-                    appIds = oldExclude.appIds.toMutableMap().apply {
-                        set(actionLog.appId, checked)
-                    },
-                ).stringify(),
-            ),
+        RuleGroupConfigService.updateGroupEnabled(
+            RuleGroupTarget.Global(actionLog.subsId, actionLog.groupKey, actionLog.appId),
+            !checked,
         )
     }
 
     suspend fun toggleActivityExclusion() {
-        val state = dialogStateFlow.value ?: return
-        val actionLog = state.actionLog
+        val actionLog = dialogStateFlow.value?.actionLog ?: return
         val activityId = actionLog.activityId ?: return
-        val subsConfig = state.subsConfig ?: if (actionLog.groupType == RuleGroupType.App) {
-            SubsAppGroupConfig(
-                subsId = actionLog.subsId,
-                appId = actionLog.appId,
-                groupKey = actionLog.groupKey,
-            )
+        val target = if (actionLog.groupType == RuleGroupType.App) {
+            RuleGroupTarget.App(actionLog.subsId, actionLog.appId, actionLog.groupKey)
         } else {
-            SubsGlobalGroupConfig(
-                subsId = actionLog.subsId,
-                groupKey = actionLog.groupKey,
-            )
+            RuleGroupTarget.Global(actionLog.subsId, actionLog.groupKey)
         }
-        val oldExclude = ExcludeData.parse(subsConfig.exclude)
-        RuleGroupConfigService.save(
-            subsConfig.withExclude(
-                exclude = oldExclude.switch(actionLog.appId, activityId).stringify(),
-            ),
-        )
+        RuleGroupConfigService.toggleActivityExclusion(target, actionLog.appId, activityId)
     }
 }

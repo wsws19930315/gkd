@@ -1,6 +1,10 @@
 package li.gkd.app.data.settings
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
@@ -13,6 +17,9 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import java.io.IOException
+import li.gkd.app.util.json
 import org.junit.Test
 import java.nio.file.Files
 
@@ -111,6 +118,122 @@ class SettingsRepositoryTest {
         } finally {
             writeScope.cancel()
             parent.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun failedRestoreKeepsLaterEditsAndIncrementsWithoutKeepingImportedValues() = runBlocking {
+        withRepository { repository, directory ->
+            repository.updateSettings { it.copy(enableMatch = true, httpServerPort = 8000) }
+            repository.incrementActionCount()
+            repository.replaceBlockMatchAppList(setOf("local.app"))
+            val entries = mapOf(
+                "store.json" to json.encodeToString(testDefaults().copy(enableMatch = false, httpServerPort = 9000)),
+                "action_count.txt" to "100",
+                "block_match_app_list.txt" to "imported.app",
+            )
+
+            val failure = runCatching {
+                repository.withBackupRestore(entries) {
+                    coroutineScope {
+                        val settings = async(Dispatchers.Default) {
+                            repository.updateSettings { it.copy(httpServerPort = 8123) }
+                            repository.updateBlockMatchAppList { it + "later.app" }
+                        }
+                        val increments = List(20) {
+                            async(Dispatchers.Default) { repository.incrementActionCount() }
+                        }
+                        settings.await()
+                        increments.awaitAll()
+                    }
+                    throw IOException("database commit failed")
+                }
+            }.exceptionOrNull()
+
+            assertTrue(failure is IOException)
+            assertTrue(repository.settings.value.enableMatch)
+            assertEquals(8123, repository.settings.value.httpServerPort)
+            assertEquals(21L, repository.actionCount.value)
+            assertEquals(setOf("local.app", "later.app"), repository.blockMatchAppList.value)
+            assertEquals("21", directory.resolve("action_count.txt").readText())
+            val persisted = json.decodeFromString<SettingsStore>(directory.resolve("store.json").readText())
+            assertEquals(repository.settings.value, persisted)
+        }
+    }
+
+    @Test
+    fun successfulRestoreKeepsImportedValuesAndLaterCommands() = runBlocking {
+        withRepository { repository, directory ->
+            val result = repository.withBackupRestore(mapOf("action_count.txt" to "100")) {
+                repository.incrementActionCount()
+                "committed"
+            }
+            withTimeout(5_000) { repository.awaitPersistence() }
+
+            assertEquals("committed", result)
+            assertEquals(101L, repository.actionCount.value)
+            assertEquals("101", directory.resolve("action_count.txt").readText())
+            // The rollback shadow must be released after success so another restore can start.
+            repository.withBackupRestore(mapOf("action_count.txt" to "200")) { }
+            assertEquals(200L, repository.actionCount.value)
+        }
+    }
+
+    @Test
+    fun cancelledRestorePersistsRollbackAndRetainsUpdatesMadeWhileSuspended() = runBlocking {
+        withRepository { repository, directory ->
+            repository.incrementActionCount()
+            val entered = CompletableDeferred<Unit>()
+            val restore = launch {
+                repository.withBackupRestore(mapOf("action_count.txt" to "100")) {
+                    entered.complete(Unit)
+                    awaitCancellation()
+                }
+            }
+            withTimeout(5_000) { entered.await() }
+            repository.incrementActionCount()
+            withTimeout(5_000) { restore.cancelAndJoin() }
+
+            assertEquals(2L, repository.actionCount.value)
+            assertEquals("2", directory.resolve("action_count.txt").readText())
+        }
+    }
+
+    @Test
+    fun failedRestoreWriteDoesNotStartDatabaseWorkAndWriterCanRecover() = runBlocking {
+        withRepository { repository, directory ->
+            // A directory at the target path makes the atomic file replacement fail.
+            directory.resolve("action_count.txt").mkdir()
+            var databaseWorkStarted = false
+            val result = runCatching {
+                withTimeout(5_000) {
+                    repository.withBackupRestore(mapOf("action_count.txt" to "100")) {
+                        databaseWorkStarted = true
+                    }
+                }
+            }
+            assertTrue(result.exceptionOrNull() is IOException)
+            assertFalse(databaseWorkStarted)
+            assertEquals(0L, repository.actionCount.value)
+
+            directory.resolve("action_count.txt").delete()
+            repository.incrementActionCount()
+            withTimeout(5_000) { repository.awaitPersistence() }
+            assertEquals("1", directory.resolve("action_count.txt").readText())
+        }
+    }
+
+    private suspend fun withRepository(block: suspend (SettingsRepository, java.io.File) -> Unit) {
+        val directory = Files.createTempDirectory("gkd-settings-restore-test").toFile()
+        val writer = SupervisorJob()
+        try {
+            val repository = SettingsRepository(
+                directory, CoroutineScope(writer + Dispatchers.Default), ::testDefaults, ::emptySet,
+            )
+            withTimeout(10_000) { block(repository, directory) }
+        } finally {
+            writer.cancelAndJoin()
+            directory.deleteRecursively()
         }
     }
 

@@ -1,8 +1,6 @@
 package li.gkd.app.ui.home
 
 import android.net.Uri
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import li.gkd.app.service.TrackService
 import li.gkd.app.service.fixRestartAutomatorService
 import li.gkd.app.store.storeFlow
@@ -69,13 +67,9 @@ class SettingsVm : BaseViewModel() {
 
     suspend fun importBackup(uri: Uri) {
         toast("导入备份中...")
-        val skipped = withContext(Dispatchers.IO) {
-            backupManager.importData(uri)
-        }
+        val skipped = backupManager.importData(uri)
         toast(if (skipped > 0) "导入成功，已跳过 $skipped 条所属订阅已不存在的配置" else "导入成功")
     }
 
-    suspend fun exportBackup(): File = withContext(Dispatchers.IO) {
-        backupManager.exportData()
-    }
+    suspend fun exportBackup(): File = backupManager.exportData()
 }

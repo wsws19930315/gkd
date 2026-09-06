@@ -40,6 +40,15 @@ service / receiver ─► data、domain、platform
 
 Composable 不得直接访问 `Db`、文件或 Service 生命周期。ViewModel 可以直接使用 `Db` 提供的职责单一 DAO，并负责聚合页面一致性所需状态；不要为了形式上的依赖注入把全局唯一 DAO 塞入 ViewModel 构造器。跨数据源写入和具有业务规则的操作交给 Repository、Manager 或 Service。Service、Receiver 和无障碍运行时不得引用页面 ViewModel。
 
+## 协程、线程与并发
+
+- 页面操作由 ViewModel 的作用域管理，默认从 Main 发起。执行阻塞文件操作的函数在内部切换到 IO，大量解析和计算在内部切换到 Default；调用方不为已经负责线程切换的函数重复指定调度器。Room 挂起 DAO 使用数据库配置的协程上下文。
+- 线程调度不代替业务一致性。简单字段更新直接调用 DAO；基于旧值的规则配置修改由 `RuleGroupConfigService` 接收目标和变更，通过 `SubscriptionConfigStore` 在同一写事务中读取最新值并更新。文本编辑以开始编辑时的排除配置检测冲突，同时保留其他字段的新值。
+- `A11yState` 在私有锁内更新前台信息和规则选择，并通过一个 `ActivityRule` 快照发布。涉及特权进程或 PackageManager 的阻塞查询时，通过 `A11yState.withTopActivityLock` 将查询、判断和更新放在同一临界区，不能只锁最终赋值或换成调用方自身的锁。`topActivityFlow` 只是该快照的展示投影；`currentTopActivity` 无锁读取已发布快照，需要等待更新临界区完成时使用 `A11yState.currentRule`。规则执行过程中的计数、延迟任务等运行状态仍由无障碍引擎管理。
+- 设置的 `update/replace` 返回表示内存更新和持久化请求已被接受；`awaitPersistence` 才表示调用时已接受的请求完成落盘。转换函数必须无副作用，备份恢复期间可能对恢复状态和回滚状态各计算一次。
+- 备份读取和解析阶段可以取消；获得订阅写锁后，恢复提交和必要补偿完成后才释放锁。数据库导入由一个写事务回滚，不用历史整库快照覆盖其他写入；订阅文件的保存、补偿与普通订阅修改互斥。设置回滚保留恢复期间收到的新命令。
+- 普通操作跟随调用方生命周期。应用级作用域只承接明确需要跨页面存活的工作，并提供完成或失败语义；`NonCancellable` 只覆盖已接受的提交和补偿区间。
+
 ## 新代码放置
 
 1. 新页面优先放入对应 `feature/<name>`；只有两个以上功能使用的纯 UI 才进入 `ui/component` 或 `ui/share`。

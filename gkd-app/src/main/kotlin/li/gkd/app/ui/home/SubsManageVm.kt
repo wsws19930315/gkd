@@ -1,6 +1,5 @@
 package li.gkd.app.ui.home
 
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -95,7 +94,7 @@ class SubsManageVm : BaseViewModel() {
     }
 
     fun refresh() {
-        scope.launchUi(Dispatchers.IO) {
+        scope.launchUi {
             subscriptionRepository.refresh().message?.let { toast(it) }
         }
     }
@@ -104,7 +103,7 @@ class SubsManageVm : BaseViewModel() {
         subscriptionRepository.delete(*(ids - LOCAL_SUBS_ID).toLongArray())
 
     fun updateOrder(items: List<SubsItem>) {
-        scope.launchUi(Dispatchers.IO) {
+        scope.launchUi {
             Db.subsItemDao.batchUpdateOrder(items)
         }
     }
@@ -140,7 +139,7 @@ class SubsManageVm : BaseViewModel() {
     }
 
     private fun setSubscriptionEnabled(item: SubsItem, enabled: Boolean) {
-        scope.launchUi(Dispatchers.IO) {
+        scope.launchUi {
             Db.subsItemDao.updateEnable(item.id, enabled)
         }
     }
