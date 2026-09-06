@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
 import li.gkd.app.a11y.A11yCommonImpl
 import li.gkd.app.a11y.A11yRuleEngine
+import li.gkd.app.a11y.A11yRuntime
 import li.gkd.app.store.updateEnableAutomator
 import li.gkd.app.util.AndroidTarget
 import li.gkd.app.util.AutomatorModeOption
@@ -73,7 +74,7 @@ class AutomationService private constructor(
         connected = true
         toast("自动化已启动")
         updateEnableAutomator(true)
-        ruleEngine.onA11yConnected()
+        A11yRuntime.onA11yConnected(this)
     }
 
     private fun disconnect() {

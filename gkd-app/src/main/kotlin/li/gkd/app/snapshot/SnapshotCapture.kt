@@ -15,7 +15,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
-import li.gkd.app.a11y.A11yRuleEngine
+import li.gkd.app.a11y.A11yRuntime
 import li.gkd.app.a11y.currentTopActivity
 import li.gkd.app.data.ComplexSnapshot
 import li.gkd.app.data.RpcError
@@ -179,7 +179,7 @@ object SnapshotCapture {
             null
         } else {
             try {
-                A11yRuleEngine.screenshot()
+                A11yRuntime.screenshot()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -230,12 +230,12 @@ object SnapshotCapture {
     }
 
     suspend fun capture(forcedCropStatusBar: Boolean = false): ComplexSnapshot {
-        val engine = A11yRuleEngine.instance ?: throw RpcError("服务不可用，请先授权")
+        val service = A11yRuntime.service ?: throw RpcError("服务不可用，请先授权")
         if (!captureMutex.tryLock()) {
             throw RpcError("正在保存快照，不可重复操作")
         }
         try {
-            val rootNode = engine.safeActiveWindow
+            val rootNode = A11yRuntime.getRoot(service)
                 ?: throw RpcError("当前应用没有无障碍信息，捕获失败")
             val snapshotId = System.currentTimeMillis()
             val appId = rootNode.packageName.toString()
@@ -246,7 +246,7 @@ object SnapshotCapture {
                 val nodes = async(Dispatchers.IO) { info2nodeList(rootNode) }
                 val activityId = async(Dispatchers.IO) { resolveActivityId(appId) }
                 val capturedScreen = async(Dispatchers.Default) {
-                    captureScreen(appId, engine.service.mode, forcedCropStatusBar)
+                    captureScreen(appId, service.mode, forcedCropStatusBar)
                 }
                 val result = capturedScreen.await()
                 try {

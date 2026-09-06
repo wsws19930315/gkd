@@ -1,13 +1,9 @@
 package li.gkd.app.a11y
 
-import android.accessibilityservice.AccessibilityService
-import android.graphics.Bitmap
 import android.util.Log
 import android.view.Display
-import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
-import android.view.accessibility.AccessibilityWindowInfo
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.getAndUpdate
 import kotlinx.coroutines.Dispatchers
@@ -16,34 +12,22 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import li.gkd.app.META
 import li.gkd.app.data.ActionPerformer
-import li.gkd.app.data.ActionResult
 import li.gkd.app.data.AppRule
-import li.gkd.app.data.GkdAction
 import li.gkd.app.data.ResolvedRule
-import li.gkd.app.data.RpcError
 import li.gkd.app.data.RuleStatus
 import li.gkd.app.platform.lifecycle.MainActivityVisibility
-import li.gkd.app.service.A11yService
 import li.gkd.app.service.EventService
 import li.gkd.app.service.topAppIdFlow
 import li.gkd.app.priv.privilegeContextFlow
-import li.gkd.app.priv.uiAutomationFlow
 import li.gkd.app.store.actualBlockA11yAppList
 import li.gkd.app.store.storeFlow
 import li.gkd.app.util.AndroidTarget
-import li.gkd.app.util.AutomatorModeOption
 import li.gkd.app.util.launchLogged
-import li.gkd.app.util.runMainPost
 import li.gkd.app.util.ToastUtils.showActionToast
 import li.gkd.app.util.systemUiAppId
-import li.gkd.selector.MatchOptions
-import li.gkd.selector.Selector
-import li.gkd.selector.SelectorCompileResult
-import li.gkd.selector.SelectorTypeResult
 import java.util.concurrent.Executors
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
@@ -54,31 +38,14 @@ private val eventDispatcher = Executors.newSingleThreadExecutor().asCoroutineDis
 private val queryDispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
 private val actionDispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
 
-private val latestServiceMode = atomic(0)
-private val latestServiceTime = atomic(0L)
-
-class A11yRuleEngine(val service: A11yCommonImpl) {
-    private val a11yContext = A11yContext(this)
-    private val effective get() = latestServiceMode.value == service.mode.value
-    private val hasOthersService = when (service.mode) {
-        AutomatorModeOption.A11yMode -> uiAutomationFlow.value != null
-        AutomatorModeOption.AutomationMode -> A11yService.instance != null
-    }
+class A11yRuleEngine(private val service: A11yCommonImpl) {
+    private val a11yContext = A11yContext(getRoot = { safeActiveWindow })
+    private val effective get() = A11yRuntime.isEffective(service)
+    private val hasOthersService = A11yRuntime.hasOtherService(service)
 
     fun onA11yConnected() {
-        val serviceTime = System.currentTimeMillis()
-        latestServiceMode.value = service.mode.value
-        latestServiceTime.value = serviceTime
         if (storeFlow.value.enableBlockA11yAppList && !actualBlockA11yAppList.contains(topAppIdFlow.value)) {
             startQueryJob(byForced = true)
-        }
-        runMainPost(1000L) {// 共存 1000ms, 等待另一个服务稳定
-            if (latestServiceTime.value == serviceTime) {
-                when (service.mode) {
-                    AutomatorModeOption.A11yMode -> uiAutomationFlow.value?.shutdown(true)
-                    AutomatorModeOption.AutomationMode -> A11yService.instance?.shutdown(true)
-                }
-            }
         }
     }
 
@@ -99,7 +66,7 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
             a11yContext.rootCache.value = this
         }
 
-    val safeActiveWindowAppId: String?
+    private val safeActiveWindowAppId: String?
         get() = safeActiveWindow?.packageName?.toString()
 
     private val scope get() = service.scope
@@ -437,52 +404,4 @@ class A11yRuleEngine(val service: A11yCommonImpl) {
         return activityRule !== A11yState.currentRule
     }
 
-    companion object {
-        val service: A11yCommonImpl?
-            get() = uiAutomationFlow.value?.takeIf {
-                it.mode.value == latestServiceMode.value
-            } ?: A11yService.instance
-        val instance: A11yRuleEngine? get() = service?.ruleEngine
-
-        fun compatWindows(): List<AccessibilityWindowInfo> {
-            return try {
-                service?.windowInfos
-            } catch (_: Throwable) {
-                null
-            } ?: emptyList()
-        }
-
-        fun onScreenForcedActive() {
-            instance?.onScreenForcedActive()
-        }
-
-        fun performActionBack(): Boolean {
-            val r1 = privilegeContextFlow.value?.keyevent(KeyEvent.KEYCODE_BACK)
-            if (r1 == true) return true
-            return A11yService.instance?.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK) == true
-        }
-
-        suspend fun screenshot(): Bitmap? = service?.screenshot()
-
-        suspend fun execAction(gkdAction: GkdAction): ActionResult {
-            val selectorResult = Selector.compile(gkdAction.selector)
-            val selector = (selectorResult as? SelectorCompileResult.Success)?.value
-                ?: throw RpcError("非法选择器")
-            val typeResult = selector.validateType(selectorTypeModel)
-            if (typeResult is SelectorTypeResult.Failure) {
-                throw RpcError("选择器类型错误:${typeResult.error.message}")
-            }
-            val s = instance ?: throw RpcError("服务未连接")
-            val a = s.safeActiveWindow ?: throw RpcError("界面没有节点信息")
-            val targetNode = A11yContext(s, interruptable = false).querySelfOrSelector(
-                a, selector, MatchOptions(fastQuery = gkdAction.fastQuery)
-            ) ?: throw RpcError("没有查询到节点")
-            return withContext(Dispatchers.IO) {
-                ActionPerformer
-                    .getAction(gkdAction.action ?: ActionPerformer.None.action)
-                    .perform(targetNode, gkdAction)
-            }
-        }
-
-    }
 }

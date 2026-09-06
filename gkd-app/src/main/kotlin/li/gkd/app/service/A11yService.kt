@@ -18,6 +18,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import li.gkd.app.a11y.A11yCommonImpl
 import li.gkd.app.a11y.A11yRuleEngine
+import li.gkd.app.a11y.A11yRuntime
 import li.gkd.app.a11y.A11yState
 import li.gkd.app.a11y.currentTopActivity
 import li.gkd.app.a11y.updateTopActivity
@@ -184,7 +185,7 @@ abstract class A11yService : AccessibilityService(), A11yCommonImpl {
         connected = true
         toast("无障碍已启动")
         if (currentAppUseA11y) {
-            ruleEngine.onA11yConnected()
+            A11yRuntime.onA11yConnected(this)
         }
     }
 

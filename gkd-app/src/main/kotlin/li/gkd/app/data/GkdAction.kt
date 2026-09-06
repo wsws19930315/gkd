@@ -6,7 +6,7 @@ import android.view.ViewConfiguration
 import android.view.accessibility.AccessibilityNodeInfo
 import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
-import li.gkd.app.a11y.A11yRuleEngine
+import li.gkd.app.a11y.A11yRuntime
 import li.gkd.app.priv.privilegeContextFlow
 import li.gkd.app.priv.toHidden
 import li.gkd.app.service.A11yService
@@ -192,7 +192,7 @@ sealed class ActionPerformer(val action: String) {
         ): ActionResult {
             return ActionResult(
                 action = action,
-                result = A11yRuleEngine.performActionBack()
+                result = A11yRuntime.performActionBack()
             )
         }
     }

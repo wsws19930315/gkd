@@ -35,7 +35,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
-import li.gkd.app.a11y.A11yRuleEngine
+import li.gkd.app.a11y.A11yRuntime
 import li.gkd.app.appScope
 import li.gkd.app.data.AppInfo
 import li.gkd.app.data.DeviceInfo
@@ -229,7 +229,7 @@ private fun createServer(port: Int) = embeddedServer(CIO, port) {
             }
             post("/execSelector") {
                 val gkdAction = call.receive<GkdAction>()
-                call.respond(A11yRuleEngine.execAction(gkdAction))
+                call.respond(A11yRuntime.execAction(gkdAction))
             }
         }
     }

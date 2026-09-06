@@ -187,7 +187,7 @@ private val screenStateReceiver = object : BroadcastReceiver() {
         if (isInteractive) {
             val t = System.currentTimeMillis()
             if (t - appChangeTime > 500) { // 37.872(a11y) -> 38.228(onReceive)
-                A11yRuleEngine.onScreenForcedActive()
+                A11yRuntime.onScreenForcedActive()
             }
         }
     }

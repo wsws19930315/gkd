@@ -36,7 +36,7 @@ private val AccessibilityNodeInfo?.notExpiredNode: AccessibilityNodeInfo?
     }
 
 class A11yContext(
-    private val a11yEngine: A11yRuleEngine,
+    private val getRoot: () -> AccessibilityNodeInfo?,
     private val interruptable: Boolean = true,
 ) {
     private class RuleMatchInterrupted : CancellationException()
@@ -133,7 +133,7 @@ class A11yContext(
 
     private fun getA11Root(): AccessibilityNodeInfo? {
         guardInterrupt()
-        return a11yEngine.safeActiveWindow
+        return getRoot()
     }
 
     private fun getA11Child(node: AccessibilityNodeInfo, index: Int): AccessibilityNodeInfo? {
